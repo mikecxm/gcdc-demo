@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Article, CoAuthor, Conference, ThematicLine
+from .models import Article, ArticleVersion, CoAuthor, Conference, ThematicLine
 
 
 @admin.register(ThematicLine)
@@ -25,6 +25,12 @@ class CoAuthorInline(admin.TabularInline):
     extra = 1
 
 
+class ArticleVersionInline(admin.TabularInline):
+    model = ArticleVersion
+    extra = 0
+    readonly_fields = ("uploaded_at",)
+
+
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
     list_display = (
@@ -36,4 +42,4 @@ class ArticleAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "thematic_line")
     search_fields = ("title", "keywords", "responsible_author__email")
-    inlines = [CoAuthorInline]
+    inlines = [CoAuthorInline, ArticleVersionInline]

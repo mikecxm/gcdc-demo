@@ -121,3 +121,49 @@ class CoAuthor(models.Model):
 
     def __str__(self):
         return f"{self.full_name} <{self.email}>"
+
+class VersionStage(models.TextChoices):
+    INICIAL = "INICIAL", _("Versión inicial")
+    CORREGIDA_PRESENTACION = "CORREGIDA_PRESENTACION", _("Corregida para presentación")
+    FINAL_PUBLICACION = "FINAL_PUBLICACION", _("Final para publicación")
+
+
+class ArticleVersion(models.Model):
+    """Cada PDF subido de un artículo (historial de versiones)."""
+
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="versions",
+        verbose_name=_("artículo"),
+    )
+    version_number = models.PositiveIntegerField(_("número de versión"))
+    stage = models.CharField(
+        _("etapa"),
+        max_length=30,
+        choices=VersionStage.choices,
+        default=VersionStage.INICIAL,
+    )
+    pdf_url = models.URLField(_("URL del PDF"), max_length=500)
+    copyright_pdf_url = models.URLField(
+        _("URL del PDF de cesión de copyright"),
+        max_length=500,
+        blank=True,
+        default="",
+    )
+    uploaded_at = models.DateTimeField(_("fecha de subida"), auto_now_add=True)
+
+    class Meta:
+        db_table = "version_articulo"
+        verbose_name = _("versión de artículo")
+        verbose_name_plural = _("versiones de artículo")
+        ordering = ["article", "version_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article", "version_number"],
+                name="version_articulo_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.article.title} - v{self.version_number}"
