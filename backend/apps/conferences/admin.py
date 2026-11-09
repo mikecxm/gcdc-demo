@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Article, ArticleVersion, CoAuthor, Conference, ThematicLine
+from .models import (
+    Article,
+    ArticleVersion,
+    CoAuthor,
+    Conference,
+    JuryAssignment,
+    JuryEvaluation,
+    ThematicLine,
+)
 
 
 @admin.register(ThematicLine)
@@ -43,3 +51,14 @@ class ArticleAdmin(admin.ModelAdmin):
     list_filter = ("status", "thematic_line")
     search_fields = ("title", "keywords", "responsible_author__email")
     inlines = [CoAuthorInline, ArticleVersionInline]
+
+@admin.register(JuryAssignment)
+class JuryAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("article", "juror", "assigned_at")
+    list_filter = ("juror",)
+
+
+@admin.register(JuryEvaluation)
+class JuryEvaluationAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "version", "verdict", "evaluated_at")
+    list_filter = ("verdict",)
