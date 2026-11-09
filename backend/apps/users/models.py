@@ -127,3 +127,31 @@ class UserRole(models.Model):
 
     def __str__(self):
         return f"{self.user.email} -> {self.role}"
+
+class PasswordResetPin(models.Model):
+    """PIN de 6 dígitos para recuperar la contraseña.
+
+    Reglas del informe: el PIN expira a los 10 minutos y se permiten
+    máximo 3 intentos de validación. Se guarda su hash, no el PIN en claro.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="password_reset_pins",
+        verbose_name=_("usuario"),
+    )
+    pin_hash = models.CharField(_("hash del PIN"), max_length=128)
+    expires_at = models.DateTimeField(_("expira en"))
+    attempts = models.PositiveSmallIntegerField(_("intentos"), default=0)
+    is_used = models.BooleanField(_("utilizado"), default=False)
+    created_at = models.DateTimeField(_("creado en"), auto_now_add=True)
+
+    class Meta:
+        db_table = "pin_recuperacion"
+        verbose_name = _("PIN de recuperación")
+        verbose_name_plural = _("PIN de recuperación")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PIN de {self.user.email} ({self.created_at:%Y-%m-%d %H:%M})"
