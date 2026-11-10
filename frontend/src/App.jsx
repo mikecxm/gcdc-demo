@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserCreationForm } from './components/UserCreationForm';
+import { UserCreationForm } from './components/users/UserCreationForm';
 
 const LIBRARY_BG_URL =
   'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1600&auto=format&fit=crop';

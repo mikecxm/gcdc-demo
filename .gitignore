@@ -1,16 +1,29 @@
 # Entorno virtual
 venv/
 .venv/
+env/
 
 # Variables de entorno
 .env
+backend/.env
+*.env
 
 # Python
 __pycache__/
 *.pyc
+*.py[cod]
+*$py.class
 
 # Bases de datos locales
+backend/db.sqlite3
+*.sqlite3
 db.sqlite3
+
+# Node / Frontend
+node_modules/
+dist/
 
 # Editor
 .vscode/
+.idea/
+*.DS_Store
