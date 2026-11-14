@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -62,6 +63,17 @@ class UserManager(BaseUserManager):
         )
 
 
+class SoftDeleteUserManager(UserManager):
+    """Manager que devuelve únicamente usuarios activos no eliminados lógicamente."""
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(is_active=True, deleted_at__isnull=True)
+        )
+
+
 class CustomUser(AbstractUser):
     username = None  # Se elimina: el login es por email
 
@@ -72,7 +84,8 @@ class CustomUser(AbstractUser):
         null=False,
     )
     full_name = models.CharField(_("nombre completo"), max_length=255)
-    affiliation = models.CharField(_("afiliación"), max_length=255)
+    affiliation = models.CharField(_("afiliación"), max_length=255, blank=True)
+    bio = models.TextField(_("biografía"), null=True, blank=True)
     roles = models.ManyToManyField(
         Role,
         through="UserRole",
@@ -88,14 +101,17 @@ class CustomUser(AbstractUser):
     REQUIRED_FIELDS = ["full_name", "affiliation"]
 
     objects = UserManager()
+    active_objects = SoftDeleteUserManager()
+    all_objects = UserManager()
 
     class Meta:
         db_table = "custom_user"
         verbose_name = _("usuario")
         verbose_name_plural = _("usuarios")
         indexes = [
-            models.Index(fields=["email"], name="custom_user_email_idx"),
-            models.Index(fields=["is_active"], name="custom_user_active_idx"),
+            models.Index(fields=["email"], name="idx_user_email"),
+            models.Index(fields=["affiliation"], name="idx_user_affiliation"),
+            models.Index(fields=["is_active", "email"], name="idx_user_active_email"),
         ]
 
     def __str__(self):
@@ -103,6 +119,12 @@ class CustomUser(AbstractUser):
 
     def has_role(self, role_name):
         return self.user_roles.filter(role__name=role_name).exists()
+
+    def soft_delete(self):
+        """Baja lógica: asigna is_active=False, deleted_at=timezone.now() y persiste los cambios."""
+        self.is_active = False
+        self.deleted_at = timezone.now()
+        self.save()
 
 
 class UserRole(models.Model):
@@ -123,6 +145,9 @@ class UserRole(models.Model):
             models.UniqueConstraint(
                 fields=["user", "role"], name="usuario_rol_unique"
             ),
+        ]
+        indexes = [
+            models.Index(fields=["role", "user"], name="idx_userrole_role_user"),
         ]
 
     def __str__(self):

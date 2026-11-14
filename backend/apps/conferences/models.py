@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
 
@@ -80,6 +82,13 @@ class Article(models.Model):
         choices=ArticleStatus.choices,
         default=ArticleStatus.POSTULADO,
     )
+    is_enabled = models.BooleanField(_("habilitado"), default=True, db_index=True)
+    disabled_reason = models.TextField(
+        _("motivo de deshabilitación"), null=True, blank=True
+    )
+    disabled_at = models.DateTimeField(
+        _("fecha de deshabilitación"), null=True, blank=True
+    )
     is_permanently_disabled = models.BooleanField(
         _("deshabilitado de forma irreversible"), default=False
     )
@@ -92,6 +101,14 @@ class Article(models.Model):
         ordering = ["-submitted_at"]
         indexes = [
             models.Index(fields=["status"], name="articulo_status_idx"),
+            models.Index(
+                fields=["is_enabled", "thematic_line", "status"],
+                name="idx_art_enabled_topic_status",
+            ),
+            models.Index(
+                fields=["responsible_author", "is_enabled"],
+                name="idx_art_author_enabled",
+            ),
         ]
 
     def __str__(self):
@@ -167,3 +184,140 @@ class ArticleVersion(models.Model):
 
     def __str__(self):
         return f"{self.article.title} - v{self.version_number}"
+
+
+class ArticleMetadataAudit(models.Model):
+    """Histórico de auditoría de modificaciones de metadatos de artículos."""
+
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="metadata_audits",
+        verbose_name=_("artículo"),
+    )
+    field_name = models.CharField(_("nombre del campo"), max_length=50)
+    old_value = models.TextField(_("valor anterior"), null=True, blank=True)
+    new_value = models.TextField(_("valor nuevo"), null=True, blank=True)
+    modified_at = models.DateTimeField(
+        _("fecha de modificación"), auto_now_add=True, db_index=True
+    )
+
+    class Meta:
+        db_table = "auditoria_metadatos_articulo"
+        verbose_name = _("auditoría de metadatos de artículo")
+        verbose_name_plural = _("auditorías de metadatos de artículo")
+        ordering = ["-modified_at"]
+
+    def __str__(self):
+        return f"[{self.modified_at}] Artículo {self.article_id}: {self.field_name}"
+
+
+@receiver(pre_save, sender=Article)
+def audit_article_metadata(sender, instance, **kwargs):
+    """
+    GCDC-150 (HU-09): Audita automáticamente en base de datos cualquier
+    modificación realizada sobre los metadatos del artículo ('title' y 'abstract').
+    """
+    if instance.pk:
+        try:
+            old = Article.objects.only("title", "abstract").get(pk=instance.pk)
+        except Article.DoesNotExist:
+            return
+
+        for field_name in ("title", "abstract"):
+            old_val = getattr(old, field_name, None)
+            new_val = getattr(instance, field_name, None)
+            if old_val != new_val:
+                ArticleMetadataAudit.objects.create(
+                    article=instance,
+                    field_name=field_name,
+                    old_value=old_val,
+                    new_value=new_val,
+                )
+
+class ArticleReviewer(models.Model):
+    """Asignación de un miembro del comité como jurado de un artículo.
+
+    Cada artículo debe tener exactamente 3 jurados (se valida en la
+    lógica de negocio), y un jurado no puede repetirse en el mismo artículo.
+    """
+
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="reviewer_assignments",
+        verbose_name=_("artículo"),
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewer_assignments",
+        verbose_name=_("jurado"),
+    )
+    assigned_at = models.DateTimeField(_("fecha de asignación"), auto_now_add=True)
+
+    class Meta:
+        db_table = "asignacion_jurado"
+        verbose_name = _("asignación de jurado")
+        verbose_name_plural = _("asignaciones de jurado")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article", "reviewer"],
+                name="unique_article_reviewer",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.reviewer.email} -> {self.article.title}"
+
+
+class Decision(models.TextChoices):
+    ACEPTADO = "ACEPTADO", _("Aceptado")
+    RECHAZADO = "RECHAZADO", _("Rechazado")
+    AVALADO = "AVALADO", _("Avalado")
+    NO_AVALADO = "NO_AVALADO", _("No avalado")
+
+
+class Evaluation(models.Model):
+    """Evaluación de una versión de artículo hecha por un jurado asignado."""
+
+    version = models.ForeignKey(
+        ArticleVersion,
+        on_delete=models.CASCADE,
+        related_name="evaluations",
+        verbose_name=_("versión"),
+    )
+    assignment = models.ForeignKey(
+        ArticleReviewer,
+        on_delete=models.CASCADE,
+        related_name="evaluations",
+        verbose_name=_("asignación"),
+    )
+    originality_score = models.DecimalField(
+        _("calificación de originalidad"), max_digits=3, decimal_places=1
+    )
+    technical_quality_score = models.DecimalField(
+        _("calificación de calidad técnica"), max_digits=3, decimal_places=1
+    )
+    relevance_score = models.DecimalField(
+        _("calificación de pertinencia"), max_digits=3, decimal_places=1
+    )
+    comments = models.TextField(_("comentarios"))
+    decision = models.CharField(
+        _("dictamen"), max_length=12, choices=Decision.choices
+    )
+    evaluated_at = models.DateTimeField(_("fecha de evaluación"), auto_now_add=True)
+
+    class Meta:
+        db_table = "evaluacion_jurado"
+        verbose_name = _("evaluación de jurado")
+        verbose_name_plural = _("evaluaciones de jurado")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["version", "assignment"],
+                name="unique_version_assignment_evaluation",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.assignment} - {self.decision}"
