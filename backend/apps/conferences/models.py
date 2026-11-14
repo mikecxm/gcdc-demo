@@ -234,3 +234,90 @@ def audit_article_metadata(sender, instance, **kwargs):
                     old_value=old_val,
                     new_value=new_val,
                 )
+
+class ArticleReviewer(models.Model):
+    """Asignación de un miembro del comité como jurado de un artículo.
+
+    Cada artículo debe tener exactamente 3 jurados (se valida en la
+    lógica de negocio), y un jurado no puede repetirse en el mismo artículo.
+    """
+
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="reviewer_assignments",
+        verbose_name=_("artículo"),
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reviewer_assignments",
+        verbose_name=_("jurado"),
+    )
+    assigned_at = models.DateTimeField(_("fecha de asignación"), auto_now_add=True)
+
+    class Meta:
+        db_table = "asignacion_jurado"
+        verbose_name = _("asignación de jurado")
+        verbose_name_plural = _("asignaciones de jurado")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article", "reviewer"],
+                name="unique_article_reviewer",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.reviewer.email} -> {self.article.title}"
+
+
+class Decision(models.TextChoices):
+    ACEPTADO = "ACEPTADO", _("Aceptado")
+    RECHAZADO = "RECHAZADO", _("Rechazado")
+    AVALADO = "AVALADO", _("Avalado")
+    NO_AVALADO = "NO_AVALADO", _("No avalado")
+
+
+class Evaluation(models.Model):
+    """Evaluación de una versión de artículo hecha por un jurado asignado."""
+
+    version = models.ForeignKey(
+        ArticleVersion,
+        on_delete=models.CASCADE,
+        related_name="evaluations",
+        verbose_name=_("versión"),
+    )
+    assignment = models.ForeignKey(
+        ArticleReviewer,
+        on_delete=models.CASCADE,
+        related_name="evaluations",
+        verbose_name=_("asignación"),
+    )
+    originality_score = models.DecimalField(
+        _("calificación de originalidad"), max_digits=3, decimal_places=1
+    )
+    technical_quality_score = models.DecimalField(
+        _("calificación de calidad técnica"), max_digits=3, decimal_places=1
+    )
+    relevance_score = models.DecimalField(
+        _("calificación de pertinencia"), max_digits=3, decimal_places=1
+    )
+    comments = models.TextField(_("comentarios"))
+    decision = models.CharField(
+        _("dictamen"), max_length=12, choices=Decision.choices
+    )
+    evaluated_at = models.DateTimeField(_("fecha de evaluación"), auto_now_add=True)
+
+    class Meta:
+        db_table = "evaluacion_jurado"
+        verbose_name = _("evaluación de jurado")
+        verbose_name_plural = _("evaluaciones de jurado")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["version", "assignment"],
+                name="unique_version_assignment_evaluation",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.assignment} - {self.decision}"
