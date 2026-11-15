@@ -29,6 +29,14 @@ export const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('symposia_auth_token');
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const registerUser = async (
   payload: Omit<UserCreatePayload, 'role'>
 ): Promise<UserResponse> => {

@@ -34,7 +34,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: true,
     submitted_at: '2026-10-18T14:32:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 11,
@@ -68,7 +68,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'EN_EVALUACION',
     is_enabled: true,
     submitted_at: '2026-10-12T09:15:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [],
   },
   {
@@ -87,7 +87,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'ACEPTADO',
     is_enabled: true,
     submitted_at: '2026-09-28T16:45:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 13,
@@ -114,7 +114,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'CON_AVAL',
     is_enabled: true,
     submitted_at: '2026-09-15T11:20:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 14,
@@ -148,7 +148,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'RECHAZADO',
     is_enabled: true,
     submitted_at: '2026-08-30T17:10:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 16,
@@ -175,7 +175,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'CON_AVAL',
     is_enabled: true,
     submitted_at: '2026-10-05T08:50:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 17,
@@ -201,7 +201,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: false, // Inactivo: debe ser filtrado
     submitted_at: '2026-07-20T10:00:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [],
   },
 ];
@@ -242,5 +242,78 @@ export const getArticles = async (): Promise<FetchArticlesResponse> => {
       isFallback: true,
       total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
     };
+  }
+};
+
+export interface DisableArticleResponse {
+  id: number;
+  status: string;
+  is_enabled: boolean;
+  disabled_reason: string;
+  disabled_at: string;
+}
+
+/**
+ * Deshabilita de forma irreversible un artículo.
+ * Realiza POST /api/v1/articles/{id}/disable/ con payload { reason }.
+ */
+export const disableArticle = async (
+  articleId: number,
+  reason: string
+): Promise<DisableArticleResponse> => {
+  const isMockArticle = MOCK_ARTICLES.some((a) => a.id === articleId);
+
+  try {
+    const response = await apiClient.post<DisableArticleResponse>(
+      `/articles/${articleId}/disable/`,
+      { reason }
+    );
+    // Sincronizar en el arreglo mock en memoria si existe
+    const mockIndex = MOCK_ARTICLES.findIndex((a) => a.id === articleId);
+    if (mockIndex !== -1) {
+      MOCK_ARTICLES[mockIndex] = {
+        ...MOCK_ARTICLES[mockIndex],
+        is_enabled: false,
+      };
+    }
+    return response.data;
+  } catch (error: any) {
+    // Si estamos probando con un artículo simulado (mock) en desarrollo, o si el backend
+    // aún no tiene el módulo de autenticación/JWT activo para emitir tokens de sesión,
+    // procesamos la deshabilitación como mock para permitir probar el flujo completo en la UI.
+    if (isMockArticle) {
+      console.warn(
+        `[Symposia Articles] El backend respondió con código ${
+          error?.response?.status || 'desconocido'
+        } (${error?.response?.data?.detail || error.message}) para el artículo mock #${articleId}. Aplicando deshabilitación en modo prueba:`,
+        error
+      );
+      const mockIndex = MOCK_ARTICLES.findIndex((a) => a.id === articleId);
+      if (mockIndex !== -1) {
+        MOCK_ARTICLES[mockIndex] = {
+          ...MOCK_ARTICLES[mockIndex],
+          is_enabled: false,
+        };
+      }
+      return {
+        id: articleId,
+        status: 'DESHABILITADO',
+        is_enabled: false,
+        disabled_reason: reason,
+        disabled_at: new Date().toISOString(),
+      };
+    }
+
+    // Para artículos reales de base de datos, propagar errores específicos de validación o del backend
+    if (error?.response?.data?.detail) {
+      throw new Error(error.response.data.detail);
+    }
+    if (error?.response?.data?.reason) {
+      const reasonErrors = Array.isArray(error.response.data.reason)
+        ? error.response.data.reason.join(', ')
+        : error.response.data.reason;
+      throw new Error(reasonErrors);
+    }
+    throw error;
   }
 };
