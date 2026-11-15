@@ -1,6 +1,8 @@
 from django.urls import path
 
+from .disable_views import ArticleDisableView
+
 # Rutas para el módulo articles (postulaciones, versiones de artículos, coautores)
 urlpatterns = [
-    # TODO: Registrar endpoints de articles aquí
+    path("<int:pk>/disable/", ArticleDisableView.as_view(), name="article-disable"),
 ]
