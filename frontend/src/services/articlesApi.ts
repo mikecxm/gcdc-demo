@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Article } from '../types/article';
+import type { Article, ArticleVersion } from '../types/article';
 
 export const THEMATIC_LINES: string[] = [
   'Inteligencia Artificial',
@@ -19,7 +19,7 @@ export const ARTICLE_STATUSES: { value: string; label: string }[] = [
 
 export const MOCK_ARTICLES: Article[] = [
   {
-    id: 1,
+    id: 101,
     title: 'Optimización de Modelos Fundacionales para Detección Temprana de Plagas en Cultivos de Caña',
     abstract:
       'Este trabajo presenta un enfoque novedoso basado en visión por computadora y modelos fundacionales ligeros adaptados para la identificación temprana de anomalías en cultivos agrícolas del Valle del Cauca. Se evalúa el desempeño en inferencia en el borde (edge computing) con una precisión de F1-Score superior al 94.2% frente a perturbaciones climáticas extremas.',
@@ -35,6 +35,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-10-18T14:32:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [
       {
         id: 11,
@@ -53,7 +54,7 @@ export const MOCK_ARTICLES: Article[] = [
     ],
   },
   {
-    id: 2,
+    id: 102,
     title: 'Arquitectura de Microservicios Resilientes con Consenso Raft para Sistemas de Salud',
     abstract:
       'Analizamos la implementación de un clúster distribuido tolerante a particiones de red para la historia clínica interoperable en el suroccidente colombiano. Se demuestra cómo mitigar estados inconsistentes y latencias críticas bajo condiciones de alta concurrencia y conectividad intermitente.',
@@ -69,10 +70,11 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-10-12T09:15:00Z',
     pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [],
   },
   {
-    id: 3,
+    id: 103,
     title: 'Framework para la Verificación Formal de Smart Contracts en Redes Blockchain de Segunda Capa',
     abstract:
       'Proponemos una metodología de análisis estático y verificación formal aplicada a contratos inteligentes financieros. Mediante demostración automática de teoremas reducimos en un 87% las vulnerabilidades por reentrancia, desbordamiento aritmético y fallos de aserción en protocolos DeFi.',
@@ -88,6 +90,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-09-28T16:45:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [
       {
         id: 13,
@@ -115,6 +118,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-09-15T11:20:00Z',
     pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [
       {
         id: 14,
@@ -149,6 +153,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-08-30T17:10:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [
       {
         id: 16,
@@ -176,6 +181,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: true,
     submitted_at: '2026-10-05T08:50:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [
       {
         id: 17,
@@ -202,6 +208,7 @@ export const MOCK_ARTICLES: Article[] = [
     is_enabled: false, // Inactivo: debe ser filtrado
     submitted_at: '2026-07-20T10:00:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    submission_deadline: '2027-12-31',
     coauthors: [],
   },
 ];
@@ -211,6 +218,32 @@ export interface FetchArticlesResponse {
   isFallback: boolean;
   total: number;
 }
+
+export const getArticleVersions = async (
+  articleId: number,
+  token?: string
+): Promise<ArticleVersion[]> => {
+  const response = await apiClient.get<ArticleVersion[]>(
+    `/articles/${articleId}/versions/`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+  );
+  return response.data;
+};
+
+export const replaceArticlePdf = async (articleId: number, pdf: File, token?: string) => {
+  const formData = new FormData();
+  formData.append('pdf', pdf);
+  return apiClient.post<ArticleVersion>(
+    `/articles/${articleId}/versions/`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
+  );
+};
 
 /**
  * Obtiene la lista de artículos desde el backend (/articles/ o /api/articles/).

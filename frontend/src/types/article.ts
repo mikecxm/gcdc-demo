@@ -34,7 +34,17 @@ export interface Article {
   is_enabled: boolean;
   submitted_at: string;
   pdf_url: string;
+  submission_deadline?: string;
   coauthors: CoAuthor[];
+}
+
+export interface ArticleVersion {
+  id: number;
+  version_number: number;
+  stage: string;
+  uploaded_at: string;
+  pdf_url?: string;
+  file_name?: string;
 }
 
 export interface ArticleFilters {
