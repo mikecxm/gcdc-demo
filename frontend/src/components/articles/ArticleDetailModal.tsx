@@ -3,6 +3,7 @@ import type { Article, ArticleVersion } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
 import { useAuth } from '../../context';
 import { PdfVersionManager } from './PdfVersionManager';
+import PdfViewer from './PdfViewer';
 import {
   X,
   ExternalLink,
@@ -290,47 +291,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
             )}
           </div>
 
-          {/* Visor PDF embebido */}
-          <div className="space-y-3 pt-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-slate-500" />
-                Manuscrito Adjunto (Visor de PDF)
-              </h3>
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline self-start sm:self-auto"
-              >
-                <span>Abrir manuscrito en pestaña nueva</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner">
-              <iframe
-                src={pdfUrl}
-                title={`Manuscrito PDF: ${article.title}`}
-                className="w-full h-80 sm:h-96 md:h-[460px] bg-white"
-              >
-                <p className="p-4 text-xs text-slate-500 text-center">
-                  Tu navegador no soporta visualización directa de PDF en el iframe.{' '}
-                  <a
-                    href={pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-600 font-semibold underline"
-                  >
-                    Haz clic aquí para descargar o visualizar el documento.
-                  </a>
-                </p>
-              </iframe>
-            </div>
-            <p className="text-[11px] text-slate-400 italic">
-              * El documento se renderiza en modo seguro de solo lectura para la revisión del Comité Científico.
-            </p>
-          </div>
+          <PdfViewer pdfUrl={pdfUrl} title={article.title} />
 
           {canManagePdf && (
             <PdfVersionManager

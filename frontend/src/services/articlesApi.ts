@@ -34,7 +34,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: true,
     submitted_at: '2026-10-18T14:32:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [
       {
@@ -69,7 +69,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'EN_EVALUACION',
     is_enabled: true,
     submitted_at: '2026-10-12T09:15:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [],
   },
@@ -89,7 +89,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'ACEPTADO',
     is_enabled: true,
     submitted_at: '2026-09-28T16:45:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [
       {
@@ -117,7 +117,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'CON_AVAL',
     is_enabled: true,
     submitted_at: '2026-09-15T11:20:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [
       {
@@ -152,7 +152,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'RECHAZADO',
     is_enabled: true,
     submitted_at: '2026-08-30T17:10:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [
       {
@@ -180,7 +180,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'CON_AVAL',
     is_enabled: true,
     submitted_at: '2026-10-05T08:50:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [
       {
@@ -207,7 +207,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: false, // Inactivo: debe ser filtrado
     submitted_at: '2026-07-20T10:00:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     submission_deadline: '2027-12-31',
     coauthors: [],
   },
