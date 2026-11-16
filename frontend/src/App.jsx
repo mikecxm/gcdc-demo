@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserCreationForm } from './components/users/UserCreationForm';
 import { ArticleCatalogView } from './views/ArticleCatalogView';
+import { ReviewerAssignmentPanel } from './components/articles/ReviewerAssignmentPanel';
 import { useAuth } from './context';
 
 const LIBRARY_BG_URL =
@@ -8,6 +9,8 @@ const LIBRARY_BG_URL =
 
 function App() {
   const { user, role } = useAuth();
+  const canAccessReviewerAssignment =
+    Boolean(user) && (role === 'ADMIN' || role === 'COMITE');
 
   // Estados de navegación y vistas
   const [currentView, setCurrentView] = useState(() => {
@@ -28,6 +31,9 @@ function App() {
     if (hash === '#usuarios' || path.includes('/usuarios') || path.includes('/users')) {
       return 'usuarios';
     }
+    if (hash === '#jurados' && canAccessReviewerAssignment) {
+      return 'jurados';
+    }
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
@@ -45,6 +51,9 @@ function App() {
       } else if (hash === '#usuarios') {
         setCurrentView('workspace');
         setWorkspaceTab('usuarios');
+      } else if (hash === '#jurados' && canAccessReviewerAssignment) {
+        setCurrentView('workspace');
+        setWorkspaceTab('jurados');
       } else if (hash === '#registro' || hash === '#public') {
         setCurrentView('public');
       }
@@ -52,9 +61,10 @@ function App() {
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [canAccessReviewerAssignment]);
 
   const navigateTo = (view, tab) => {
+    if (tab === 'jurados' && !canAccessReviewerAssignment) return;
     setCurrentView(view);
     setIsMobileMenuOpen(false);
     if (tab) {
@@ -87,7 +97,8 @@ function App() {
       {/* ========================================================
           SWITCHER FLOTANTE INFERIOR PARA PRUEBAS RÁPIDAS
          ======================================================== */}
-      <div className="fixed bottom-4 right-4 z-[9999] bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-2xl p-1.5 sm:p-2 flex items-center gap-1.5 text-xs font-medium">
+      {!(currentView === 'workspace' && workspaceTab === 'jurados') && (
+        <div className="fixed bottom-4 right-4 z-[9999] bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-2xl p-1.5 sm:p-2 flex items-center gap-1.5 text-xs font-medium">
         <span className="text-slate-400 px-2 font-mono hidden sm:inline">Ruta:</span>
         <button
           type="button"
@@ -122,7 +133,8 @@ function App() {
         >
           Registro Público
         </button>
-      </div>
+        </div>
+      )}
 
       {/* ========================================================
           1. VISTA PÚBLICA (SPLIT SCREEN: ARQUITECTURA + PORTAL)
@@ -335,6 +347,46 @@ function App() {
                   </span>
                 </button>
 
+                {canAccessReviewerAssignment && (
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('workspace', 'jurados')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                      workspaceTab === 'jurados'
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className={`w-4 h-4 ${
+                          workspaceTab === 'jurados' ? 'text-indigo-600' : 'text-slate-400'
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M8 7h8m-8 4h8m-8 4h5m5 5H6a2 2 0 01-2-2V4a2 2 0 012-2h8l5 5v11a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <span>Asignación de Jurados</span>
+                    </div>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                        workspaceTab === 'jurados'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      HU-12
+                    </span>
+                  </button>
+                )}
+
                 {/* Ítem: Directorio de Usuarios */}
                 <button
                   type="button"
@@ -440,7 +492,9 @@ function App() {
                   <span className="text-slate-800 font-medium">
                     {workspaceTab === 'articulos'
                       ? 'Catálogo de Artículos'
-                      : 'Directorio de Usuarios'}
+                      : workspaceTab === 'usuarios'
+                      ? 'Directorio de Usuarios'
+                      : 'Asignación de Jurados'}
                   </span>
                 </div>
               </div>
@@ -459,6 +513,12 @@ function App() {
             {/* Contenido dinámico según la pestaña activa */}
             <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
               {workspaceTab === 'articulos' && <ArticleCatalogView />}
+
+              {canAccessReviewerAssignment && (
+                <div className={workspaceTab === 'jurados' ? 'block min-w-0' : 'hidden'}>
+                  <ReviewerAssignmentPanel />
+                </div>
+              )}
 
               {workspaceTab === 'usuarios' && (
                 <div className="space-y-6 text-left">

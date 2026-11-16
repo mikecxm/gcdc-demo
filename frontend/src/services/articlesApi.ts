@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Article } from '../types/article';
+import type { Article, CommitteeMember } from '../types/article';
 
 export const THEMATIC_LINES: string[] = [
   'Inteligencia Artificial',
@@ -203,6 +203,73 @@ export const MOCK_ARTICLES: Article[] = [
     submitted_at: '2026-07-20T10:00:00Z',
     pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
     coauthors: [],
+  },
+];
+
+export const MOCK_COMMITTEE_MEMBERS: CommitteeMember[] = [
+  {
+    id: 101,
+    email: 'carlos.mendoza@correounivalle.edu.co',
+    full_name: 'Dr. Carlos Mendoza',
+    roles: ['COMITE'],
+    thematic_lines: ['Inteligencia Artificial'],
+    assigned_article_count: 2,
+  },
+  {
+    id: 11,
+    email: 'mateo.gomez@correounivalle.edu.co',
+    full_name: 'Ing. Mateo Gómez',
+    roles: ['COMITE'],
+    thematic_lines: ['Sistemas Distribuidos'],
+    assigned_article_count: 1,
+  },
+  {
+    id: 12,
+    email: 'sofia.rincon@unal.edu.co',
+    full_name: 'Dra. Sofía Rincón',
+    roles: ['COMITE'],
+    thematic_lines: ['Inteligencia Artificial'],
+    assigned_article_count: 3,
+  },
+  {
+    id: 202,
+    email: 'elena.valencia@correounivalle.edu.co',
+    full_name: 'Dra. Elena Valencia',
+    roles: ['COMITE'],
+    thematic_lines: ['Inteligencia Artificial', 'Ciencia de Datos'],
+    assigned_article_count: 2,
+  },
+  {
+    id: 203,
+    email: 'james.wilson@univalle.edu.co',
+    full_name: 'James Wilson',
+    roles: ['COMITE'],
+    thematic_lines: ['Ciberseguridad'],
+    assigned_article_count: 0,
+  },
+  {
+    id: 204,
+    email: 'ana.martinez@univalle.edu.co',
+    full_name: 'Dra. Ana Martínez',
+    roles: ['COMITE'],
+    thematic_lines: ['Inteligencia Artificial'],
+    assigned_article_count: 4,
+  },
+  {
+    id: 205,
+    email: 'david.ortiz@univalle.edu.co',
+    full_name: 'Dr. David Ortiz',
+    roles: ['COMITE'],
+    thematic_lines: ['Ingeniería de Software'],
+    assigned_article_count: 1,
+  },
+  {
+    id: 206,
+    email: 'lucia.vega@univalle.edu.co',
+    full_name: 'MSc. Lucía Vega',
+    roles: ['COMITE'],
+    thematic_lines: ['Sistemas Distribuidos', 'Ciencia de Datos'],
+    assigned_article_count: 5,
   },
 ];
 
