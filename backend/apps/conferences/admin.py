@@ -2,10 +2,11 @@ from django.contrib import admin
 
 from .models import (
     Article,
-    ArticleMetadataAudit,
     ArticleVersion,
     CoAuthor,
     Conference,
+    JuryAssignment,
+    JuryEvaluation,
     ThematicLine,
 )
 
@@ -38,13 +39,6 @@ class ArticleVersionInline(admin.TabularInline):
     readonly_fields = ("uploaded_at",)
 
 
-class ArticleMetadataAuditInline(admin.TabularInline):
-    model = ArticleMetadataAudit
-    extra = 0
-    readonly_fields = ("field_name", "old_value", "new_value", "modified_at")
-    can_delete = False
-
-
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
     list_display = (
@@ -56,12 +50,15 @@ class ArticleAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "thematic_line")
     search_fields = ("title", "keywords", "responsible_author__email")
-    inlines = [CoAuthorInline, ArticleVersionInline, ArticleMetadataAuditInline]
+    inlines = [CoAuthorInline, ArticleVersionInline]
+
+@admin.register(JuryAssignment)
+class JuryAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("article", "juror", "assigned_at")
+    list_filter = ("juror",)
 
 
-@admin.register(ArticleMetadataAudit)
-class ArticleMetadataAuditAdmin(admin.ModelAdmin):
-    list_display = ("article", "field_name", "old_value", "new_value", "modified_at")
-    list_filter = ("field_name", "modified_at")
-    search_fields = ("article__title", "old_value", "new_value")
-    readonly_fields = ("article", "field_name", "old_value", "new_value", "modified_at")
+@admin.register(JuryEvaluation)
+class JuryEvaluationAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "version", "verdict", "evaluated_at")
+    list_filter = ("verdict",)

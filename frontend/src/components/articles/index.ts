@@ -1,0 +1,1 @@
+export { ArticleDetailModal } from './ArticleDetailModal';
