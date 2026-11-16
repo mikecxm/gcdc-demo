@@ -1,6 +1,9 @@
 from django.urls import path
 
-# Rutas para el módulo articles (postulaciones, versiones de artículos, coautores)
+from .views import ArticleDetailView, ArticleListView
+
+# Rutas para el módulo articles (GCDC-145: Consulta y listado de artículos con filtros y detalle)
 urlpatterns = [
-    # TODO: Registrar endpoints de articles aquí
+    path("", ArticleListView.as_view(), name="article-list"),
+    path("<int:pk>/", ArticleDetailView.as_view(), name="article-detail"),
 ]

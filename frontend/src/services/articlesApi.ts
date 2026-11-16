@@ -216,9 +216,13 @@ export interface FetchArticlesResponse {
  * Obtiene la lista de artículos desde el backend (/articles/ o /api/articles/).
  * Si el endpoint aún no está disponible o falla, retorna automáticamente los datos mock de respaldo.
  */
-export const getArticles = async (): Promise<FetchArticlesResponse> => {
+export const getArticles = async (filters?: {
+  thematic_line?: string;
+  status?: string;
+  search?: string;
+}): Promise<FetchArticlesResponse> => {
   try {
-    const response = await apiClient.get<Article[]>('/articles/');
+    const response = await apiClient.get<Article[]>('/articles/', { params: filters });
     if (Array.isArray(response.data) && response.data.length > 0) {
       return {
         data: response.data.filter((art) => art.is_enabled),
@@ -242,5 +246,23 @@ export const getArticles = async (): Promise<FetchArticlesResponse> => {
       isFallback: true,
       total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
     };
+  }
+};
+
+/**
+ * Obtiene el detalle de un artículo específico por su ID desde el backend (/articles/{id}/).
+ */
+export const getArticleById = async (id: number): Promise<Article> => {
+  try {
+    const response = await apiClient.get<Article>(`/articles/${id}/`);
+    return response.data;
+  } catch (err) {
+    console.warn(
+      `[Symposia Articles] Error al obtener el artículo ${id} desde el backend. Buscando en mock:`,
+      err
+    );
+    const mock = MOCK_ARTICLES.find((a) => a.id === id);
+    if (mock) return mock;
+    throw err;
   }
 };
