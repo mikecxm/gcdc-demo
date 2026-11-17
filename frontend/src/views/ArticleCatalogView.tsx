@@ -497,6 +497,7 @@ export const ArticleCatalogView: React.FC = () => {
           4. MODAL DE DETALLE Y VISOR PDF EMBEBIDO
          ======================================================== */}
       <ArticleDetailModal
+        key={selectedArticle?.id}
         article={selectedArticle}
         isOpen={isModalOpen}
         onClose={handleCloseDetail}
