@@ -1,14 +1,19 @@
+from datetime import timedelta
 import time
+from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.conferences.models import (
     Article,
+    ArticleMetadataAudit,
     ArticleStatus,
     ArticleVersion,
     CoAuthor,
+    Conference,
     ThematicLine,
     VersionStage,
 )
@@ -19,8 +24,9 @@ User = get_user_model()
 
 class ArticleEndpointsTests(APITestCase):
     """
-    Pruebas de aceptación y QA para GCDC-145 (HU-08):
-    Endpoints GET /api/v1/articles/ y GET /api/v1/articles/{id}/ con filtros y detalle.
+    Pruebas de aceptación y QA para:
+    - GCDC-145 (HU-08): Endpoints GET /api/v1/articles/ y GET /api/articles/{id}/
+    - GCDC-149 (HU-09): Endpoint PATCH /api/v1/articles/{id}/ con permisos IsArticleAuthor y deadline check
     """
 
     def setUp(self):
@@ -59,6 +65,17 @@ class ArticleEndpointsTests(APITestCase):
             full_name="Sarah Chen",
             affiliation="Universidad del Valle - Admin",
             roles=[RoleName.ADMIN],
+        )
+
+        # Conferencia vigente con plazo activo (en el futuro)
+        self.conference = Conference.objects.create(
+            edition_name="Conferencia GCDC 2026",
+            submission_deadline=timezone.now().date() + timedelta(days=30),
+            evaluation_deadline=timezone.now().date() + timedelta(days=60),
+            presentation_version_deadline=timezone.now().date() + timedelta(days=90),
+            publication_version_deadline=timezone.now().date() + timedelta(days=120),
+            event_start_date=timezone.now().date() + timedelta(days=150),
+            event_end_date=timezone.now().date() + timedelta(days=155),
         )
 
         # Líneas temáticas oficiales
@@ -125,7 +142,7 @@ class ArticleEndpointsTests(APITestCase):
         self.list_url = reverse("article-list")
 
     # -------------------------------------------------------------
-    # 1. Pruebas de Autenticación
+    # GCDC-145: 1. Pruebas de Autenticación
     # -------------------------------------------------------------
     def test_unauthenticated_request_returns_401(self):
         """Petición anónima al listado o detalle retorna 401 Unauthorized."""
@@ -137,11 +154,11 @@ class ArticleEndpointsTests(APITestCase):
         self.assertEqual(response_detail.status_code, status.HTTP_401_UNAUTHORIZED)
 
     # -------------------------------------------------------------
-    # 2. Control de Visibilidad por Rol (Listado)
+    # GCDC-145: 2. Control de Visibilidad por Rol (Listado)
     # -------------------------------------------------------------
     def test_author_only_sees_own_active_articles_in_list(self):
         """
-        Caso de Prueba QA 1:
+        Caso de Prueba QA 1 (GCDC-145):
         Un autor autenticado solo recibe sus propios artículos habilitados.
         """
         self.client.force_authenticate(user=self.author1)
@@ -161,7 +178,7 @@ class ArticleEndpointsTests(APITestCase):
 
     def test_committee_sees_all_active_articles_in_list(self):
         """
-        Caso de Prueba QA 2:
+        Caso de Prueba QA 2 (GCDC-145):
         Un miembro del comité ve todos los artículos activos del catálogo.
         """
         self.client.force_authenticate(user=self.committee_user)
@@ -188,7 +205,7 @@ class ArticleEndpointsTests(APITestCase):
         self.assertNotIn(self.art_author1_disabled.id, returned_ids)
 
     # -------------------------------------------------------------
-    # 3. Filtros Combinados y Búsqueda
+    # GCDC-145: 3. Filtros Combinados y Búsqueda
     # -------------------------------------------------------------
     def test_filter_by_thematic_line(self):
         """Filtrar por línea temática retorna solo artículos de esa línea."""
@@ -212,7 +229,7 @@ class ArticleEndpointsTests(APITestCase):
 
     def test_combined_filters_and_response_time_under_400ms(self):
         """
-        Criterio de Aceptación (DoD 1):
+        Criterio de Aceptación (DoD 1 - GCDC-145):
         Consulta con al menos 2 filtros combinados (thematic_line + status)
         con tiempo de respuesta <= 400 ms.
         """
@@ -251,7 +268,7 @@ class ArticleEndpointsTests(APITestCase):
         self.assertEqual(returned_ids, [self.art_author1_dist.id])
 
     # -------------------------------------------------------------
-    # 4. Detalle y Comprobación de Propiedad (GET /api/v1/articles/{id}/)
+    # GCDC-145: 4. Detalle y Comprobación de Propiedad (GET /api/v1/articles/{id}/)
     # -------------------------------------------------------------
     def test_author_can_view_own_article_detail(self):
         """Un autor puede consultar el detalle de su propio artículo con todos los datos."""
@@ -270,7 +287,7 @@ class ArticleEndpointsTests(APITestCase):
 
     def test_author_cannot_view_other_authors_article_detail_forbidden(self):
         """
-        Criterio de Aceptación (DoD 2):
+        Criterio de Aceptación (DoD 2 - GCDC-145):
         Un autor que consulte el ID de un artículo ajeno recibe HTTP 403 Forbidden.
         """
         self.client.force_authenticate(user=self.author1)
@@ -320,3 +337,131 @@ class ArticleEndpointsTests(APITestCase):
         response = self.client.get("/api/articles/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 3)
+
+    # -------------------------------------------------------------
+    # GCDC-149: 5. Modificación de Metadatos (PATCH /api/v1/articles/{id}/)
+    # -------------------------------------------------------------
+    def test_patch_article_success_within_deadline(self):
+        """
+        Criterio de Aceptación 1 (DoD - GCDC-149):
+        Retorno de HTTP 200 OK con metadatos actualizados ante solicitudes válidas
+        del autor propietario dentro de la fecha límite.
+        Verifica también la auditoría automática en ArticleMetadataAudit (GCDC-150 / HU-09).
+        """
+        self.client.force_authenticate(user=self.author1)
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+
+        payload = {
+            "title": "Título de Artículo Completamente Actualizado",
+            "abstract": "Nuevo resumen descriptivo del artículo con aportes novedosos.",
+            "keywords": "IA, Modelos, Actualizado, Edge",
+            "thematic_line": self.line_dist.id,
+        }
+
+        response = self.client.patch(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], payload["title"])
+        self.assertEqual(response.data["abstract"], payload["abstract"])
+        self.assertEqual(response.data["keywords"], payload["keywords"])
+        self.assertEqual(response.data["thematic_line"], "Tecnologías en Informática")
+
+        # Verificar persistencia en base de datos
+        self.art_author1_ia.refresh_from_db()
+        self.assertEqual(self.art_author1_ia.title, payload["title"])
+        self.assertEqual(self.art_author1_ia.abstract, payload["abstract"])
+        self.assertEqual(self.art_author1_ia.keywords, payload["keywords"])
+        self.assertEqual(self.art_author1_ia.thematic_line, self.line_dist)
+
+        # Verificar que la auditoría automática registró los cambios en title y abstract
+        audits = ArticleMetadataAudit.objects.filter(article=self.art_author1_ia)
+        self.assertEqual(audits.count(), 2)
+        audit_fields = {a.field_name for a in audits}
+        self.assertIn("title", audit_fields)
+        self.assertIn("abstract", audit_fields)
+
+    def test_patch_article_fails_when_deadline_passed(self):
+        """
+        Caso de Prueba QA 1 (GCDC-149):
+        Intentar modificar artículo con fecha límite vencida retorna HTTP 400 Bad Request.
+        """
+        self.client.force_authenticate(user=self.author1)
+
+        # Configurar la fecha límite de postulación como vencida
+        bogota_tz = ZoneInfo("America/Bogota")
+        today = timezone.now().astimezone(bogota_tz).date()
+        self.conference.submission_deadline = today - timedelta(days=2)
+        self.conference.save()
+
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+        payload = {
+            "title": "Intento de Modificación Tardía",
+        }
+
+        response = self.client.patch(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+        self.assertIn("plazo", response.data["detail"].lower())
+
+        # El título en base de datos no debe haber cambiado
+        self.art_author1_ia.refresh_from_db()
+        self.assertNotEqual(self.art_author1_ia.title, "Intento de Modificación Tardía")
+
+    def test_patch_article_forbidden_for_different_author(self):
+        """
+        Criterio de Aceptación 2 & Caso de Prueba QA 2 (GCDC-149):
+        Intentar modificar artículo de otro autor retorna HTTP 403 Forbidden.
+        Permiso IsArticleAuthor rechaza a Author 2 intentando editar artículo de Author 1.
+        """
+        self.client.force_authenticate(user=self.author2)
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+
+        payload = {
+            "title": "Intento de Modificación por Autor Ajeno",
+        }
+
+        response = self.client.patch(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("detail", response.data)
+
+        # El artículo no fue alterado
+        self.art_author1_ia.refresh_from_db()
+        self.assertNotEqual(self.art_author1_ia.title, "Intento de Modificación por Autor Ajeno")
+
+    def test_patch_article_forbidden_for_committee_or_admin(self):
+        """
+        Permiso IsArticleAuthor: Ni miembros del comité ni administradores
+        pueden modificar directamente los metadatos de un artículo vía PATCH
+        (la autoría corresponde exclusivamente al autor responsable).
+        """
+        # Prueba con miembro del comité
+        self.client.force_authenticate(user=self.committee_user)
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+        response = self.client.patch(url, {"title": "Modificado por Comité"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Prueba con administrador
+        self.client.force_authenticate(user=self.admin_user)
+        response_admin = self.client.patch(url, {"title": "Modificado por Admin"}, format="json")
+        self.assertEqual(response_admin.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_patch_article_unauthenticated_returns_401(self):
+        """Modificación sin credenciales retorna 401 Unauthorized."""
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+        response = self.client.patch(url, {"title": "Sin Auth"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_patch_article_validation_error_on_empty_fields(self):
+        """Intentar actualizar campos obligatorios con valores en blanco retorna 400 Bad Request."""
+        self.client.force_authenticate(user=self.author1)
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+
+        response = self.client.patch(url, {"title": "   "}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("title", response.data)
+
+        response_abstract = self.client.patch(url, {"abstract": "  "}, format="json")
+        self.assertEqual(response_abstract.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("abstract", response_abstract.data)

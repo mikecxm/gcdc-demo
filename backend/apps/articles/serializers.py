@@ -38,7 +38,7 @@ class CoAuthorDetailSerializer(serializers.ModelSerializer):
 class ArticleDetailSerializer(serializers.ModelSerializer):
     """
     Serializador completo para listado y detalle de artículos.
-    Cumple con el contrato esperado tanto por frontend como por el DoD de GCDC-145.
+    Cumple con el contrato esperado tanto por frontend como por el DoD de GCDC-145 y GCDC-149.
     """
 
     thematic_line = serializers.CharField(source="thematic_line.name", read_only=True)
@@ -71,3 +71,57 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
         if latest_version and latest_version.pdf_url:
             return latest_version.pdf_url
         return ""
+
+
+class ArticleUpdateSerializer(serializers.ModelSerializer):
+    """
+    GCDC-149 (HU-09): Serializador para actualización parcial (PATCH) de metadatos.
+    Permite modificar: title, abstract, keywords y thematic_line.
+    """
+
+    thematic_line = serializers.PrimaryKeyRelatedField(
+        queryset=ThematicLine.objects.all(), required=False
+    )
+    thematic_line_id = serializers.PrimaryKeyRelatedField(
+        queryset=ThematicLine.objects.all(), source="thematic_line", required=False
+    )
+
+    class Meta:
+        model = Article
+        fields = [
+            "title",
+            "abstract",
+            "keywords",
+            "thematic_line",
+            "thematic_line_id",
+        ]
+
+    def to_internal_value(self, data):
+        # Flexibilidad: si thematic_line viene como nombre en texto, resolver al ID correspondiente
+        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "thematic_line" in mutable_data and isinstance(mutable_data["thematic_line"], str):
+            val = mutable_data["thematic_line"].strip()
+            if not val.isdigit():
+                thematic_obj = ThematicLine.objects.filter(name__iexact=val).first()
+                if thematic_obj:
+                    mutable_data["thematic_line"] = thematic_obj.id
+
+        return super().to_internal_value(mutable_data)
+
+    def validate_title(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("El título no puede estar vacío.")
+        return cleaned
+
+    def validate_abstract(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("El resumen no puede estar vacío.")
+        return cleaned
+
+    def validate_keywords(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("Las palabras clave no pueden estar vacías.")
+        return cleaned
