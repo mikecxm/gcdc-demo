@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import type { Article, ArticleVersion } from '../../types/article';
+import React, { useEffect, useState } from 'react';
+import type { Article } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
-import { useAuth } from '../../context';
+import { useAuth } from '../../context/SessionContext';
+import { getArticleApiErrorMessage, getArticleById } from '../../services/articlesApi';
 import PdfViewer from './PdfViewer';
 import { DisableArticleModal } from './DisableArticleModal';
 import {
@@ -150,16 +151,59 @@ interface ArticleDetailModalProps {
 }
 
 export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
-  article,
+  article: selectedArticle,
   isOpen,
   onClose,
   onArticleDisabled,
 }) => {
-  const { isAuthenticated, role, token, user } = useAuth();
+  const { session } = useAuth();
+  const role = session?.activeRole;
+  const [fetchedArticle, setFetchedArticle] = useState<Article | null>(null);
+  const [detailError, setDetailError] = useState<{
+    articleId: number;
+    attempt: number;
+    message: string;
+  } | null>(null);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const selectedArticleId = selectedArticle?.id;
+  const article =
+    fetchedArticle?.id === selectedArticle?.id ? fetchedArticle : selectedArticle;
+  const currentDetailError =
+    selectedArticleId !== undefined &&
+    detailError?.articleId === selectedArticleId &&
+    detailError.attempt === detailAttempt
+      ? detailError.message
+      : null;
   const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
-  const [currentPdfUrl, setCurrentPdfUrl] = useState(article?.pdf_url ?? '');
-  const [localVersions, setLocalVersions] = useState<ArticleVersion[]>([]);
-  const objectUrls = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!isOpen || selectedArticleId === undefined) return;
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    getArticleById(selectedArticleId, controller.signal)
+      .then((result) => {
+        if (isActive) {
+          setFetchedArticle(result);
+          setDetailError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (isActive && !controller.signal.aborted) {
+          setDetailError({
+            articleId: selectedArticleId,
+            attempt: detailAttempt,
+            message: getArticleApiErrorMessage(error),
+          });
+        }
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [detailAttempt, isOpen, selectedArticleId]);
 
   // Manejo de la tecla Escape y bloqueo de scroll en el body
   useEffect(() => {
@@ -181,14 +225,6 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, isDisableModalOpen, onClose]);
-
-  useEffect(
-    () => () => {
-      objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-      objectUrls.current.clear();
-    },
-    [article?.id]
-  );
 
   if (!isOpen || !article) {
     return null;
@@ -213,13 +249,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   const keywordsList = article.keywords
     ? article.keywords.split(',').map((k) => k.trim())
     : [];
-  const pdfUrl = currentPdfUrl || article.pdf_url;
-  const canManagePdf =
-    isAuthenticated && role === 'AUTOR' && user?.roles.includes('AUTOR');
-  const handleCurrentPdfUrlChange = (url: string) => {
-    if (url.startsWith('blob:')) objectUrls.current.add(url);
-    setCurrentPdfUrl(url);
-  };
+  const pdfUrl = article.pdf_url;
 
   return (
     <>
@@ -285,6 +315,22 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
 
           {/* Cuerpo del Modal con scroll */}
           <div className="p-5 sm:p-6 space-y-6 overflow-y-auto text-left">
+            {currentDetailError && (
+              <div
+                role="alert"
+                className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span>No se pudo actualizar el detalle: {currentDetailError}</span>
+                <button
+                  type="button"
+                  onClick={() => setDetailAttempt((attempt) => attempt + 1)}
+                  className="self-start font-semibold text-rose-700 underline sm:self-auto"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
+
             {/* Metadatos Rápidos: Fecha y Autor */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
               <div className="flex items-center gap-3">

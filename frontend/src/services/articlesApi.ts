@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient } from './api';
 import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
 
@@ -9,12 +10,13 @@ export const THEMATIC_LINES: string[] = [
   'Ciencia de Datos',
 ];
 
-export const ARTICLE_STATUSES: { value: string; label: string }[] = [
+export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
   { value: 'POSTULADO', label: 'Postulado' },
-  { value: 'EN_EVALUACION', label: 'En Evaluación' },
+  { value: 'EN_REVISION', label: 'En revisión' },
   { value: 'ACEPTADO', label: 'Aceptado' },
   { value: 'RECHAZADO', label: 'Rechazado' },
-  { value: 'CON_AVAL', label: 'Con Aval' },
+  { value: 'AVAL_PRESENTACION', label: 'Aval para presentación' },
+  { value: 'AVAL_PUBLICACION', label: 'Aval para publicación' },
 ];
 
 export const MOCK_ARTICLES: Article[] = [
@@ -65,7 +67,7 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'carlos.mendoza@correounivalle.edu.co',
       affiliation: 'Universidad del Valle - Escuela de Ing. de Sistemas',
     },
-    status: 'EN_EVALUACION',
+    status: 'EN_REVISION',
     is_enabled: true,
     submitted_at: '2026-10-12T09:15:00Z',
     pdf_url: '/manuscript-sample.pdf',
@@ -111,7 +113,7 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'maria.ortiz@javerianacali.edu.co',
       affiliation: 'Pontificia Universidad Javeriana Cali',
     },
-    status: 'CON_AVAL',
+    status: 'AVAL_PRESENTACION',
     is_enabled: true,
     submitted_at: '2026-09-15T11:20:00Z',
     pdf_url: '/manuscript-sample.pdf',
@@ -172,7 +174,7 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'carlos.mendoza@correounivalle.edu.co',
       affiliation: 'Universidad del Valle - Escuela de Ing. de Sistemas',
     },
-    status: 'CON_AVAL',
+    status: 'AVAL_PUBLICACION',
     is_enabled: true,
     submitted_at: '2026-10-05T08:50:00Z',
     pdf_url: '/manuscript-sample.pdf',
@@ -208,9 +210,45 @@ export const MOCK_ARTICLES: Article[] = [
 
 export interface FetchArticlesResponse {
   data: Article[];
-  isFallback: boolean;
   total: number;
 }
+
+export interface ArticleListFilters {
+  thematic_line?: string;
+  status?: ArticleStatus;
+  search?: string;
+}
+
+export const getArticleApiErrorMessage = (error: unknown): string => {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
+  }
+
+  if (!error.response) {
+    return 'No fue posible conectarse con el servidor. Verifica que el backend esté en ejecución.';
+  }
+
+  const data: unknown = error.response.data;
+  let message: string | undefined;
+
+  if (typeof data === 'string') {
+    message = data.trim() || undefined;
+  } else if (typeof data === 'object' && data !== null) {
+    const payload = data as Record<string, unknown>;
+    const value = payload.detail ?? payload.non_field_errors ?? Object.values(payload)[0];
+    if (typeof value === 'string') {
+      message = value;
+    } else if (Array.isArray(value)) {
+      message = value.filter((item): item is string => typeof item === 'string').join(', ');
+    }
+  }
+
+  if (message) return message;
+  if (error.response.status === 401) return 'Inicia sesión con una cuenta válida para consultar los artículos.';
+  if (error.response.status === 403) return 'No tienes permiso para consultar estos artículos.';
+  if (error.response.status === 404) return 'El recurso solicitado no existe en el servidor.';
+  return `El servidor respondió con el código ${error.response.status}.`;
+};
 
 export const getArticleVersions = async (
   articleId: number,
@@ -238,59 +276,31 @@ export const replaceArticlePdf = async (articleId: number, pdf: File, token?: st
   );
 };
 
-/**
- * Obtiene la lista de artículos desde el backend (/articles/ o /api/articles/).
- * Si el endpoint aún no está disponible o falla, retorna automáticamente los datos mock de respaldo.
- */
-export const getArticles = async (filters?: {
-  thematic_line?: string;
-  status?: string;
-  search?: string;
-}): Promise<FetchArticlesResponse> => {
-  try {
-    const response = await apiClient.get<Article[]>('/articles/', { params: filters });
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return {
-        data: response.data.filter((art) => art.is_enabled),
-        isFallback: false,
-        total: response.data.length,
-      };
-    }
-    // Si la API responde con un arreglo vacío, usamos el mock para permitir evaluar la interfaz
-    return {
-      data: MOCK_ARTICLES.filter((art) => art.is_enabled),
-      isFallback: true,
-      total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
-    };
-  } catch (err) {
-    console.warn(
-      '[Symposia Articles] El endpoint /articles/ aún no está disponible en el backend. Usando datos simulados (Mock Data):',
-      err
-    );
-    return {
-      data: MOCK_ARTICLES.filter((art) => art.is_enabled),
-      isFallback: true,
-      total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
-    };
+/** Obtiene artículos activos desde la API y aplica los filtros combinados del catálogo. */
+export const getArticles = async (
+  filters: ArticleListFilters = {},
+  signal?: AbortSignal
+): Promise<FetchArticlesResponse> => {
+  const params = {
+    ...(filters.thematic_line ? { thematic_line: filters.thematic_line } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.search ? { search: filters.search } : {}),
+  };
+  const response = await apiClient.get<Article[]>('/articles/', { params, signal });
+
+  if (!Array.isArray(response.data)) {
+    throw new Error('El servidor devolvió un formato de listado de artículos no válido.');
   }
+
+  return { data: response.data, total: response.data.length };
 };
 
 /**
  * Obtiene el detalle de un artículo específico por su ID desde el backend (/articles/{id}/).
  */
-export const getArticleById = async (id: number): Promise<Article> => {
-  try {
-    const response = await apiClient.get<Article>(`/articles/${id}/`);
-    return response.data;
-  } catch (err) {
-    console.warn(
-      `[Symposia Articles] Error al obtener el artículo ${id} desde el backend. Buscando en mock:`,
-      err
-    );
-    const mock = MOCK_ARTICLES.find((a) => a.id === id);
-    if (mock) return mock;
-    throw err;
-  }
+export const getArticleById = async (id: number, signal?: AbortSignal): Promise<Article> => {
+  const response = await apiClient.get<Article>(`/articles/${id}/`, { signal });
+  return response.data;
 };
 
 export interface DisableArticleResponse {
