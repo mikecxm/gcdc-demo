@@ -2,11 +2,14 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 from .models import RoleName
 from .permissions import IsAdminOrCommittee
 from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer
 from .services.recaptcha import validate_recaptcha
+from .services.login_audit import is_locked_out, record_attempt
 
 
 class UserRegisterView(generics.CreateAPIView):
@@ -54,12 +57,28 @@ class LoginView(TokenObtainPairView):
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        email = str(request.data.get("email", "")).strip().lower()
         captcha_token = request.data.get("recaptcha_token")
         remote_ip = request.META.get("REMOTE_ADDR")
+
+        if email and is_locked_out(email):
+            return Response(
+                {"detail": "Demasiados intentos fallidos. Inténtalo de nuevo en unos minutos."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
         if not validate_recaptcha(captcha_token, remote_ip):
             return Response(
                 {"detail": "Verificación CAPTCHA inválida o ausente."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return super().post(request, *args, **kwargs)
+
+        try:
+            response = super().post(request, *args, **kwargs)
+        except (AuthenticationFailed, InvalidToken, TokenError):
+            if email:
+                record_attempt(email, remote_ip, False)
+            raise
+
+        record_attempt(email, remote_ip, True)
+        return response
