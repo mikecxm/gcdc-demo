@@ -6,7 +6,8 @@ export type ArticleStatus =
   | 'EN_EVALUACION'
   | 'ACEPTADO'
   | 'RECHAZADO'
-  | 'CON_AVAL';
+  | 'CON_AVAL'
+  | 'DESHABILITADO';
 
 export interface CoAuthor {
   id: number;

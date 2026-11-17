@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Article, ArticleVersion } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
+import { useAuth } from '../../context';
 import PdfViewer from './PdfViewer';
+import { DisableArticleModal } from './DisableArticleModal';
 import {
   X,
   ExternalLink,
@@ -154,6 +156,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   onArticleDisabled,
 }) => {
   const { isAuthenticated, role, token, user } = useAuth();
+  const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
   const [currentPdfUrl, setCurrentPdfUrl] = useState(article?.pdf_url ?? '');
   const [localVersions, setLocalVersions] = useState<ArticleVersion[]>([]);
   const objectUrls = useRef(new Set<string>());

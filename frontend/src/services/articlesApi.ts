@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Article, ArticleVersion } from '../types/article';
+import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
 
 export const THEMATIC_LINES: string[] = [
   'Inteligencia Artificial',
@@ -291,4 +291,23 @@ export const getArticleById = async (id: number): Promise<Article> => {
     if (mock) return mock;
     throw err;
   }
+};
+
+export interface DisableArticleResponse {
+  id: number;
+  status: ArticleStatus;
+  is_enabled: boolean;
+  disabled_reason: string;
+  disabled_at: string;
+}
+
+export const disableArticle = async (
+  articleId: number,
+  reason: string
+): Promise<DisableArticleResponse> => {
+  const response = await apiClient.post<DisableArticleResponse>(
+    `/articles/${articleId}/disable/`,
+    { reason }
+  );
+  return response.data;
 };
