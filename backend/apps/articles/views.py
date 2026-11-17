@@ -1,19 +1,22 @@
-from rest_framework import filters, generics
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from rest_framework import filters, generics, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.conferences.models import Article
+from apps.conferences.models import Article, Conference
 from apps.users.models import RoleName
 
 from .filters import ArticleFilter
-from .permissions import IsArticleOwnerOrCommitteeOrAdmin
-from .serializers import ArticleDetailSerializer
+from .permissions import IsArticleAuthor, IsArticleOwnerOrCommitteeOrAdmin
+from .serializers import ArticleDetailSerializer, ArticleUpdateSerializer
 
 
 class ArticleListView(generics.ListAPIView):
     """
-    GET /api/v1/articles/
-    Listado de artículos con soporte de filtros y RBAC:
+    GET /api/v1/articles/ (y /api/articles/)
+    Listado de artículos con soporte de filtros y RBAC (GCDC-145):
     - Excluye siempre registros deshabilitados (is_enabled=False).
     - Si el usuario tiene rol AUTOR: lista exclusivamente sus propios artículos.
     - Si el usuario tiene rol COMITE o ADMIN: lista todos los artículos activos.
@@ -49,16 +52,19 @@ class ArticleListView(generics.ListAPIView):
 
 class ArticleDetailView(generics.RetrieveAPIView):
     """
-    GET /api/v1/articles/{id}/
-    Detalle completo de un artículo:
-    - Excluye registros deshabilitados (retorna 404).
-    - Comité y Administrador pueden consultar cualquier artículo activo.
-    - Autores solo pueden consultar sus propios artículos; si intentan consultar
-      un artículo ajeno, se retorna HTTP 403 Forbidden.
+    GET /api/v1/articles/{id}/ (GCDC-145: Detalle con RBAC)
+    PATCH /api/v1/articles/{id}/ (GCDC-149: Modificación de metadatos del autor con deadline check)
     """
 
-    serializer_class = ArticleDetailSerializer
-    permission_classes = [IsAuthenticated, IsArticleOwnerOrCommitteeOrAdmin]
+    def get_serializer_class(self):
+        if self.request.method in ["PATCH", "PUT"]:
+            return ArticleUpdateSerializer
+        return ArticleDetailSerializer
+
+    def get_permissions(self):
+        if self.request.method in ["PATCH", "PUT"]:
+            return [IsAuthenticated(), IsArticleAuthor()]
+        return [IsAuthenticated(), IsArticleOwnerOrCommitteeOrAdmin()]
 
     def get_queryset(self):
         return (
@@ -66,3 +72,44 @@ class ArticleDetailView(generics.RetrieveAPIView):
             .select_related("thematic_line", "responsible_author")
             .prefetch_related("coauthors", "versions")
         )
+
+    def patch(self, request, *args, **kwargs):
+        """
+        GCDC-149 (HU-09):
+        Actualiza parcialmente los metadatos de un artículo postulado.
+        - Requiere permiso IsArticleAuthor (solo el autor responsable puede editar).
+        - Verifica que la fecha límite de postulación no haya vencido (deadline check).
+        - Si el plazo venció, retorna HTTP 400 Bad Request.
+        - Si el usuario no es el autor responsable, retorna HTTP 403 Forbidden.
+        - Si es válido, actualiza metadatos y retorna HTTP 200 OK.
+        """
+        article = self.get_object()
+
+        # Validación de plazo contra la edición de la conferencia
+        conference = Conference.objects.order_by("-event_start_date").first()
+        if conference is not None:
+            try:
+                bogota_tz = ZoneInfo("America/Bogota")
+                today = timezone.now().astimezone(bogota_tz).date()
+            except Exception:
+                today = timezone.now().date()
+
+            if today > conference.submission_deadline:
+                return Response(
+                    {"detail": "El plazo para modificar metadatos del artículo ya venció."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        serializer = self.get_serializer(article, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        article.refresh_from_db()
+        return Response(
+            ArticleDetailSerializer(article).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def put(self, request, *args, **kwargs):
+        """Soporta también método PUT delegando a la misma lógica de actualización."""
+        return self.patch(request, *args, **kwargs)
