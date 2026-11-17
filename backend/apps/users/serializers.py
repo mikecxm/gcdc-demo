@@ -1,7 +1,7 @@
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import CustomUser, Role, RoleName, UserRole
