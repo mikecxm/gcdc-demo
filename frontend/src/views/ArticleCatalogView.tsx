@@ -18,6 +18,7 @@ import {
   Layers,
   Sparkles,
   Info,
+  CheckCircle2,
 } from 'lucide-react';
 import type { UserRole } from '../services/api';
 
@@ -38,6 +39,10 @@ export const ArticleCatalogView: React.FC = () => {
   // Estado del Modal de Detalle
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [disableSuccessNotification, setDisableSuccessNotification] = useState<{
+    articleId: number;
+    message: string;
+  } | null>(null);
 
   // Cargar artículos desde el servicio
   const loadArticles = async () => {
@@ -144,6 +149,25 @@ export const ArticleCatalogView: React.FC = () => {
     setSelectedArticle(null);
   };
 
+  const handleArticleDisabled = (articleId: number, reason: string) => {
+    // 1. Retirar inmediatamente el artículo del listado de artículos activos en React
+    setAllArticles((prevArticles) =>
+      prevArticles.filter((item) => item.id !== articleId)
+    );
+
+    // 2. Cerrar modales
+    setIsModalOpen(false);
+    setSelectedArticle(null);
+
+    // 3. Mostrar banner / toast de confirmación
+    setDisableSuccessNotification({
+      articleId,
+      message: `El artículo #${articleId} fue deshabilitado exitosamente ("${reason.slice(0, 40)}${
+        reason.length > 40 ? '...' : ''
+      }") y retirado del catálogo activo y de la agenda.`,
+    });
+  };
+
   const hasActiveFilters =
     selectedThematicLine !== 'ALL' || selectedStatus !== 'ALL' || searchQuery.trim() !== '';
 
@@ -197,6 +221,27 @@ export const ArticleCatalogView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Notificación de éxito tras deshabilitar un artículo */}
+        {disableSuccessNotification && (
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs text-left">
+                <span className="font-bold text-emerald-950 block">Artículo deshabilitado con éxito</span>
+                <p className="text-emerald-800 leading-relaxed">{disableSuccessNotification.message}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDisableSuccessNotification(null)}
+              className="text-emerald-700 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors"
+              aria-label="Cerrar notificación"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Banner Informativo de la Regla de Privacidad */}
         <div
@@ -501,6 +546,7 @@ export const ArticleCatalogView: React.FC = () => {
         article={selectedArticle}
         isOpen={isModalOpen}
         onClose={handleCloseDetail}
+        onArticleDisabled={handleArticleDisabled}
       />
     </div>
   );
