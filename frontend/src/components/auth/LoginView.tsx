@@ -1,15 +1,26 @@
 import { useRef, useState, type FormEvent } from "react";
 import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
-import { useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { login } from "../../services/auth";
-import { DASHBOARD_BY_ROLE, useAuth, type Role } from "../../context/SessionContext";
+import { useAuth, type Role } from "../../context/SessionContext";
 import RoleSelectorModal from "./RoleSelectorModal";
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
+    const data: unknown = err.response?.data;
+    if (typeof data === "object" && data !== null) {
+      const payload = data as Record<string, unknown>;
+      const detail = payload.detail ?? payload.non_field_errors;
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) {
+        const messages = detail.filter((item): item is string => typeof item === "string");
+        if (messages.length) return messages.join(", ");
+      }
+    }
+
     const status = err.response?.status;
     if (status === 400) return "Verificación CAPTCHA inválida. Inténtalo de nuevo.";
     if (status === 401) return "Correo o contraseña incorrectos."; // mensaje genérico
@@ -19,9 +30,12 @@ function getErrorMessage(err: unknown): string {
   return "Ocurrió un error. Inténtalo de nuevo.";
 }
 
+const isRole = (role: unknown): role is Role =>
+  role === "ADMIN" || role === "COMITE" || role === "AUTOR";
+
 export default function LoginView() {
   const navigate = useNavigate();
-  const { startSession, selectActiveRole } = useAuth();
+  const { session, isAuthenticated, startSession, selectActiveRole } = useAuth();
   const recaptchaRef = useRef<ReCAPTCHA>(null);
 
   const [email, setEmail] = useState("");
@@ -30,6 +44,8 @@ export default function LoginView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Role[] | null>(null);
+
+  if (isAuthenticated) return <Navigate to="/" replace />;
 
   const resetCaptcha = () => {
     recaptchaRef.current?.reset(); // el token de reCAPTCHA es de un solo uso
@@ -44,16 +60,21 @@ export default function LoginView() {
     setError(null);
     try {
       const data = await login(email.trim(), password, captchaToken);
-      const roles = data.roles as Role[];
+      const responseRoles = Array.isArray(data.roles) ? data.roles : [];
+      const roles = responseRoles.filter(isRole);
 
-      if (roles.length === 0) {
+      if (roles.length === 0 || roles.length !== responseRoles.length) {
         setError("Tu cuenta no tiene roles asignados. Contacta al administrador.");
         resetCaptcha();
         return;
       }
 
       const activeRole =
-        (data.active_role as Role | null) ?? (roles.length === 1 ? roles[0] : null);
+        data.active_role && roles.includes(data.active_role)
+          ? data.active_role
+          : roles.length === 1
+            ? roles[0]
+            : null;
 
       startSession({
         accessToken: data.access,
@@ -64,9 +85,9 @@ export default function LoginView() {
       });
 
       if (activeRole) {
-        navigate(DASHBOARD_BY_ROLE[activeRole], { replace: true });
+        navigate("/", { replace: true });
       } else {
-        setPendingRoles(roles); // varios roles: abre el modal
+        setPendingRoles(roles);
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -78,8 +99,11 @@ export default function LoginView() {
 
   const handleRoleConfirm = (role: Role) => {
     selectActiveRole(role);
-    navigate(DASHBOARD_BY_ROLE[role], { replace: true });
+    navigate("/", { replace: true });
   };
+
+  const rolesToSelect =
+    pendingRoles ?? (session && !session.activeRole ? session.roles : null);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
@@ -146,10 +170,16 @@ export default function LoginView() {
         >
           {loading ? "Ingresando..." : "Ingresar"}
         </button>
+        <p className="text-center text-sm text-gray-600">
+          ¿Aún no tienes cuenta?{" "}
+          <Link to="/#registro" className="font-medium text-blue-600 hover:underline">
+            Regístrate como autor
+          </Link>
+        </p>
       </form>
 
-      {pendingRoles && (
-        <RoleSelectorModal roles={pendingRoles} onConfirm={handleRoleConfirm} />
+      {rolesToSelect && (
+        <RoleSelectorModal roles={rolesToSelect} onConfirm={handleRoleConfirm} />
       )}
     </main>
   );

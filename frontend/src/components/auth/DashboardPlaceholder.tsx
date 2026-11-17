@@ -1,10 +1,17 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../../context/SessionContext";
+import { useAuth, type Role } from "../../context/SessionContext";
 
-export default function DashboardPlaceholder({ title }: { title: string }) {
+export default function DashboardPlaceholder({
+  title,
+  requiredRole,
+}: {
+  title: string;
+  requiredRole: Role;
+}) {
   const { session, logout } = useAuth();
 
   if (!session?.activeRole) return <Navigate to="/login" replace />;
+  if (session.activeRole !== requiredRole) return <Navigate to="/" replace />;
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 p-4">

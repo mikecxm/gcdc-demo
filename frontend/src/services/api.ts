@@ -1,4 +1,9 @@
-import axios from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import {
+  ACCESS_TOKEN_KEY,
+  clearStoredAuth,
+  REFRESH_TOKEN_KEY,
+} from './authStorage';
 
 export type UserRole = 'ADMIN' | 'COMITE' | 'AUTOR';
 
@@ -21,6 +26,7 @@ export interface UserResponse {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+type RetriableRequestConfig = InternalAxiosRequestConfig & { _authRetry?: boolean };
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -30,12 +36,64 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('symposia_auth_token');
-  if (token && token !== 'mock-dev-jwt-token-2026') {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+let refreshRequest: Promise<string> | null = null;
+
+const refreshAccessToken = (refreshToken: string): Promise<string> => {
+  if (!refreshRequest) {
+    refreshRequest = axios
+      .post<{ access: string }>(`${API_BASE_URL}/auth/refresh/`, { refresh: refreshToken })
+      .then(({ data }) => {
+        if (!data.access) throw new Error('El servidor no devolvió un token de acceso.');
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+        return data.access;
+      })
+      .catch((error: unknown) => {
+        clearStoredAuth();
+        window.dispatchEvent(new Event('symposia:auth-expired'));
+        throw error;
+      })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+  return refreshRequest;
+};
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const request = error.config as RetriableRequestConfig | undefined;
+    const url = request?.url ?? '';
+    const isAuthRequest = url.includes('/auth/login/') || url.includes('/auth/refresh/');
+
+    if (error.response?.status !== 401 || !request || request._authRetry || isAuthRequest) {
+      return Promise.reject(error);
+    }
+
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      clearStoredAuth();
+      window.dispatchEvent(new Event('symposia:auth-expired'));
+      return Promise.reject(error);
+    }
+
+    request._authRetry = true;
+    try {
+      const accessToken = await refreshAccessToken(refreshToken);
+      request.headers.set('Authorization', `Bearer ${accessToken}`);
+      return apiClient(request);
+    } catch (refreshError) {
+      return Promise.reject(refreshError);
+    }
+  }
+);
 
 export const registerUser = async (
   payload: Omit<UserCreatePayload, 'role'>

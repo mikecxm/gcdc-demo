@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import { UserCreationForm } from './components/users/UserCreationForm';
 import { ArticleCatalogView } from './views/ArticleCatalogView';
-import { useAuth } from './context';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from './context/SessionContext';
 
 const LIBRARY_BG_URL =
   'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1600&auto=format&fit=crop';
 
 function App() {
-  const { user, role } = useAuth();
+  const { session, logout } = useAuth();
+  const navigate = useNavigate();
+  const user = session ? { full_name: session.fullName } : null;
+  const role = session?.activeRole;
 
   // Estados de navegación y vistas
   const [currentView, setCurrentView] = useState(() => {
     const hash = window.location.hash.toLowerCase();
     const path = window.location.pathname.toLowerCase();
+    if (hash === '#registro' || hash === '#public') return 'public';
     if (hash === '#articulos' || path.includes('/articles') || path.includes('/catalogo')) {
       return 'workspace';
     }
@@ -80,50 +85,16 @@ function App() {
       ? 'Administrador'
       : role === 'COMITE'
       ? 'Comité Científico'
-      : 'Autor';
+      : role === 'AUTOR'
+        ? 'Autor'
+        : 'Invitado';
+
+  if (currentView === 'workspace' && !session?.activeRole) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative selection:bg-indigo-100 selection:text-indigo-900">
-      {/* ========================================================
-          SWITCHER FLOTANTE INFERIOR PARA PRUEBAS RÁPIDAS
-         ======================================================== */}
-      <div className="fixed bottom-4 right-4 z-[9999] bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200 rounded-2xl p-1.5 sm:p-2 flex items-center gap-1.5 text-xs font-medium">
-        <span className="text-slate-400 px-2 font-mono hidden sm:inline">Ruta:</span>
-        <button
-          type="button"
-          onClick={() => navigateTo('workspace', 'articulos')}
-          className={`px-3 py-1.5 rounded-xl transition-all font-semibold ${
-            currentView === 'workspace' && workspaceTab === 'articulos'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Catálogo Artículos
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateTo('workspace', 'usuarios')}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'workspace' && workspaceTab === 'usuarios'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Directorio Usuarios
-        </button>
-        <button
-          type="button"
-          onClick={() => navigateTo('public')}
-          className={`px-3 py-1.5 rounded-xl transition-all ${
-            currentView === 'public'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Registro Público
-        </button>
-      </div>
-
       {/* ========================================================
           1. VISTA PÚBLICA (SPLIT SCREEN: ARQUITECTURA + PORTAL)
          ======================================================== */}
@@ -191,10 +162,14 @@ function App() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => navigateTo('workspace', 'articulos')}
+                  onClick={() =>
+                    session?.activeRole
+                      ? navigateTo('workspace', 'articulos')
+                      : navigate('/login')
+                  }
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
-                  Ver Catálogo →
+                  {session?.activeRole ? 'Ver Catálogo →' : 'Iniciar sesión →'}
                 </button>
               </div>
             </header>
@@ -453,6 +428,16 @@ function App() {
                 <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
                   {roleLabel}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout();
+                    navigate('/login', { replace: true });
+                  }}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Cerrar sesión
+                </button>
               </div>
             </header>
 

@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import {
   adminCreateUser,
   registerUser,
@@ -613,9 +614,9 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
           <div className="pt-2 text-center">
             <p className="text-xs text-slate-500">
               ¿Ya tienes cuenta?{' '}
-              <a href="#login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+              <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
                 Inicia sesión aquí
-              </a>
+              </Link>
             </p>
           </div>
         )}
