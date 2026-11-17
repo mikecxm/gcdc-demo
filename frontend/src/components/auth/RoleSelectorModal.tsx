@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Role } from "../../context/AuthContext";
+import type { Role } from "../../context/SessionContext";
 
 const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Administrador",

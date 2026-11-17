@@ -3,7 +3,7 @@ import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
 import { useNavigate } from "react-router-dom";
 import { login } from "../../services/auth";
-import { DASHBOARD_BY_ROLE, useAuth, type Role } from "../../context/AuthContext";
+import { DASHBOARD_BY_ROLE, useAuth, type Role } from "../../context/SessionContext";
 import RoleSelectorModal from "./RoleSelectorModal";
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;

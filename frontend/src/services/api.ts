@@ -29,6 +29,14 @@ export const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('symposia_auth_token');
+  if (token && token !== 'mock-dev-jwt-token-2026') {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const registerUser = async (
   payload: Omit<UserCreatePayload, 'role'>
 ): Promise<UserResponse> => {

@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 381 >>
+stream
+BT /F1 16 Tf 50 800 Td (GCDC 2026 - Symposia) Tj 0 -30 Td /F1 12 Tf (Manuscrito de Muestra - Pagina 1) Tj 0 -25 Td (Universidad del Valle - Escuela de Ingenieria de Sistemas) Tj 0 -50 Td /F1 11 Tf (Resumen:) Tj 0 -20 Td (Este documento es un manuscrito de prueba para el sistema Symposia.) Tj 0 -18 Td (El visor integrado permite revisar el PDF sin necesidad de descargarlo.) Tj ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 424 >>
+stream
+BT /F1 16 Tf 50 800 Td (Pagina 2 - Contenido) Tj 0 -30 Td /F1 11 Tf (1. Introduccion) Tj 0 -20 Td (Symposia es un sistema de gestion de conferencias academicas.) Tj 0 -18 Td (Implementado con React + TypeScript en el frontend.) Tj 0 -18 Td (Y Django REST Framework en el backend.) Tj 0 -40 Td (2. Referencias) Tj 0 -20 Td ([1] React Docs. reactjs.org) Tj 0 -18 Td ([2] Django REST Framework. django-rest-framework.org) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+xref
+0 8
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000623 00000 n
+0000000191 00000 n
+0000001224 00000 n
+0000000121 00000 n
+0000000749 00000 n
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1350
+%%EOF

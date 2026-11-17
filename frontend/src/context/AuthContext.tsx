@@ -1,52 +1,77 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import React, { useState, useMemo } from 'react';
+import type { UserRole, UserResponse } from '../services/api';
+import { AuthContext } from './authContextDef';
 
-export type Role = "ADMIN" | "COMITE" | "AUTOR";
-
-export const DASHBOARD_BY_ROLE: Record<Role, string> = {
-  ADMIN: "/admin",
-  COMITE: "/comite",
-  AUTOR: "/autor",
+const DEV_USERS: Record<UserRole, UserResponse> = {
+  AUTOR: {
+    id: 101,
+    email: 'carlos.mendoza@correounivalle.edu.co',
+    full_name: 'Dr. Carlos Mendoza',
+    affiliation: 'Universidad del Valle - Escuela de Ing. de Sistemas',
+    roles: ['AUTOR'],
+    is_active: true,
+    created_at: '2026-03-10T10:00:00Z',
+  },
+  COMITE: {
+    id: 202,
+    email: 'elena.valencia@correounivalle.edu.co',
+    full_name: 'Dra. Elena Valencia',
+    affiliation: 'Universidad del Valle - Comité Científico Symposia',
+    roles: ['COMITE'],
+    is_active: true,
+    created_at: '2026-01-15T09:30:00Z',
+  },
+  ADMIN: {
+    id: 303,
+    email: 'sarah.chen@correounivalle.edu.co',
+    full_name: 'Sarah Chen',
+    affiliation: 'Universidad del Valle - Dirección de Investigaciones',
+    roles: ['ADMIN'],
+    is_active: true,
+    created_at: '2026-01-05T08:00:00Z',
+  },
 };
 
-interface Session {
-  accessToken: string;
-  refreshToken: string;
-  roles: Role[];
-  activeRole: Role | null;
-  fullName: string;
-}
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [role, setRoleState] = useState<UserRole>(() => {
+    const saved = localStorage.getItem('symposia_active_role');
+    return (saved as UserRole) || 'COMITE';
+  });
 
-interface AuthContextValue {
-  session: Session | null;
-  isAuthenticated: boolean; // solo es true cuando ya hay rol activo
-  startSession: (s: Session) => void;
-  selectActiveRole: (role: Role) => void;
-  logout: () => void;
-}
+  const [user, setUser] = useState<UserResponse | null>(() => {
+    return DEV_USERS[role];
+  });
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('symposia_auth_token') || 'mock-dev-jwt-token-2026';
+  });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null); // en memoria
+  const setDevRole = (newRole: UserRole) => {
+    setRoleState(newRole);
+    setUser(DEV_USERS[newRole]);
+    localStorage.setItem('symposia_active_role', newRole);
+  };
 
-  const startSession = useCallback((s: Session) => setSession(s), []);
-  const selectActiveRole = useCallback((role: Role) => {
-    setSession((prev) =>
-      prev && prev.roles.includes(role) ? { ...prev, activeRole: role } : prev
-    );
-  }, []);
-  const logout = useCallback(() => setSession(null), []);
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('symposia_auth_token');
+    localStorage.removeItem('symposia_active_role');
+  };
 
   const value = useMemo(
-    () => ({ session, isAuthenticated: !!session?.activeRole, startSession, selectActiveRole, logout }),
-    [session, startSession, selectActiveRole, logout]
+    () => ({
+      user,
+      role,
+      isAuthenticated: Boolean(user),
+      token,
+      setDevRole,
+      setUser,
+      logout,
+    }),
+    [user, role, token]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
-  return ctx;
-}
