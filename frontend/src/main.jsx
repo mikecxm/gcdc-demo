@@ -5,7 +5,6 @@ import './index.css';
 import App from './App.jsx';
 import { AuthProvider as SessionProvider } from './context/SessionContext';
 import LoginView from './components/auth/LoginView';
-import DashboardPlaceholder from './components/auth/DashboardPlaceholder';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -14,33 +13,11 @@ createRoot(document.getElementById('root')).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/login" element={<LoginView />} />
-          <Route
-            path="/admin"
-            element={
-              <DashboardPlaceholder
-                title="Dashboard de Administrador"
-                requiredRole="ADMIN"
-              />
-            }
-          />
-          <Route
-            path="/comite"
-            element={
-              <DashboardPlaceholder
-                title="Dashboard del Comité"
-                requiredRole="COMITE"
-              />
-            }
-          />
-          <Route
-            path="/autor"
-            element={
-              <DashboardPlaceholder
-                title="Dashboard del Autor"
-                requiredRole="AUTOR"
-              />
-            }
-          />
+          <Route path="/admin" element={<Navigate to="/#usuarios" replace />} />
+          <Route path="/comite" element={<Navigate to="/#usuarios" replace />} />
+          <Route path="/autor" element={<Navigate to="/#articulos" replace />} />
+          <Route path="/usuarios" element={<Navigate to="/#usuarios" replace />} />
+          <Route path="/catalogo" element={<Navigate to="/#articulos" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
