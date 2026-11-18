@@ -3,7 +3,6 @@ import type { Article } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
 import { useAuth } from '../../context/SessionContext';
 import { getArticleApiErrorMessage, getArticleById } from '../../services/articlesApi';
-import PdfViewer from './PdfViewer';
 import { DisableArticleModal } from './DisableArticleModal';
 import {
   X,
