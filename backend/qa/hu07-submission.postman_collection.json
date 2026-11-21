@@ -1,0 +1,44 @@
+{
+  "info": {
+    "name": "HU07 Postulacion y descarga PDF",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+  "variable": [
+    {"key": "baseUrl", "value": "http://127.0.0.1:8000/api/v1"},
+    {"key": "token", "value": ""},
+    {"key": "thematicLineId", "value": ""},
+    {"key": "expectedStatus", "value": "201"},
+    {"key": "expectedBytes", "value": "10380902"}
+  ],
+  "item": [
+    {
+      "name": "Postular PDF",
+      "request": {
+        "method": "POST", "url": "{{baseUrl}}/articles/",
+        "body": {"mode": "formdata", "formdata": [
+          {"key": "title", "value": "HU07 Postman QA", "type": "text"},
+          {"key": "abstract", "value": "Functional deadline and integrity test", "type": "text"},
+          {"key": "keywords", "value": "qa, pdf", "type": "text"},
+          {"key": "thematic_line", "value": "{{thematicLineId}}", "type": "text"},
+          {"key": "coauthors", "value": "[]", "type": "text"},
+          {"key": "pdf", "src": "hu07-9.9MiB.pdf", "type": "file"}
+        ]}
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Estado de postulacion esperado', () => pm.response.to.have.status(Number(pm.variables.get('expectedStatus'))));",
+        "if (pm.response.code === 201) { pm.collectionVariables.set('articleId', pm.response.json().id); }",
+        "else { pm.execution.setNextRequest(null); }"
+      ]}}]
+    },
+    {
+      "name": "Descargar PDF",
+      "request": {"method": "GET", "url": "{{baseUrl}}/articles/{{articleId}}/pdf/"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Descarga disponible', () => pm.response.to.have.status(200));",
+        "pm.test('Contenido PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));",
+        "pm.test('Tamano recuperado exacto', () => pm.expect(Number(pm.response.headers.get('Content-Length'))).to.eql(Number(pm.variables.get('expectedBytes'))));"
+      ]}}]
+    }
+  ]
+}

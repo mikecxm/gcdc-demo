@@ -49,6 +49,10 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'users.CustomUser'
 
+# Supabase remains the default; local QA can use real files without cloud keys.
+ARTICLE_PDF_STORAGE_BACKEND = config('ARTICLE_PDF_STORAGE_BACKEND', default='supabase')
+ARTICLE_PDF_ROOT = BASE_DIR / 'media' / 'article-pdfs'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
