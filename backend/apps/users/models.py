@@ -180,3 +180,32 @@ class PasswordResetPin(models.Model):
 
     def __str__(self):
         return f"PIN de {self.user.email} ({self.created_at:%Y-%m-%d %H:%M})"
+
+    
+class LoginAudit(models.Model):
+    """Registro de cada intento de login (exitoso o fallido).
+
+    No usa ForeignKey a CustomUser: también audita correos inexistentes.
+    Se usa para el bloqueo temporal por fuerza bruta.
+    """
+
+    email = models.EmailField(_("correo electrónico"))
+    ip_address = models.GenericIPAddressField(
+        _("dirección IP"), null=True, blank=True
+    )
+    timestamp = models.DateTimeField(_("fecha y hora"), auto_now_add=True)
+    is_successful = models.BooleanField(_("exitoso"), default=False)
+
+    class Meta:
+        db_table = "login_audit"
+        verbose_name = _("intento de login")
+        verbose_name_plural = _("intentos de login")
+        indexes = [
+            models.Index(
+                fields=["email", "timestamp"], name="idx_loginaudit_email_ts"
+            ),
+        ]
+
+    def __str__(self):
+        estado = "OK" if self.is_successful else "FALLO"
+        return f"{self.email} {estado} ({self.timestamp:%Y-%m-%d %H:%M})"

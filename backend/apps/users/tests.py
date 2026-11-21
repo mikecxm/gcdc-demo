@@ -230,3 +230,65 @@ class UserRegistrationTests(APITestCase):
             affiliation__startswith="Universidad"
         ).order_by("affiliation", "email")
         self.assertGreaterEqual(univalle_users.count(), 3)
+
+from unittest.mock import patch
+
+from django.contrib.auth.hashers import make_password
+from django.test import TestCase
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
+
+from apps.users.models import CustomUser, Role, RoleName, UserRole
+
+LOGIN_URL = "/api/v1/auth/login/"
+
+
+class LoginCaptchaTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.password = "Clave12345*"
+        self.user = CustomUser.objects.create(
+            email="ana@univalle.edu.co",
+            full_name="Ana Pérez",
+            affiliation="Universidad del Valle",
+            password=make_password(self.password),
+            is_active=True,
+        )
+        role, _ = Role.objects.get_or_create(name=RoleName.AUTOR)
+        UserRole.objects.create(user=self.user, role=role)
+
+    def _payload(self, **extra):
+        data = {"email": self.user.email, "password": self.password}
+        data.update(extra)
+        return data
+
+    def test_sin_captcha_retorna_400(self):
+        r = self.api.post(LOGIN_URL, self._payload(), format="json")
+        self.assertEqual(r.status_code, 400)
+
+    @patch("apps.users.views.validate_recaptcha", return_value=False)
+    def test_captcha_falso_con_credenciales_correctas_retorna_400(self, _mock):
+        r = self.api.post(LOGIN_URL, self._payload(recaptcha_token="falso"), format="json")
+        self.assertEqual(r.status_code, 400)
+
+    @patch("apps.users.views.validate_recaptcha", return_value=True)
+    def test_login_valido_retorna_200_y_tokens_con_roles(self, _mock):
+        r = self.api.post(LOGIN_URL, self._payload(recaptcha_token="ok"), format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("access", r.data)
+        self.assertIn("refresh", r.data)
+        self.assertEqual(r.data["roles"], ["AUTOR"])
+        self.assertEqual(r.data["active_role"], "AUTOR")
+        self.assertEqual(r.data["full_name"], "Ana Pérez")
+
+        token = AccessToken(r.data["access"])
+        self.assertLessEqual(token["exp"] - token["iat"], 3600)  # <= 60 min
+
+    @patch("apps.users.views.validate_recaptcha", return_value=True)
+    def test_credenciales_incorrectas_retorna_401_generico(self, _mock):
+        r = self.api.post(
+            LOGIN_URL,
+            {"email": self.user.email, "password": "mala", "recaptcha_token": "ok"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 401)

@@ -1,8 +1,21 @@
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import CustomUser, Role, RoleName, UserRole
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    roles = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name")
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id", "email", "full_name", "affiliation", "roles", "is_active", "created_at",
+        ]
+        read_only_fields = fields
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -95,3 +108,34 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return UserPublicSerializer(instance, context=self.context).data
+
+def _role_names(user):
+    return list(user.roles.values_list("name", flat=True))
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Agrega roles, active_role y full_name al JWT y a la respuesta del login."""
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        roles = _role_names(user)
+        token["roles"] = roles
+        token["active_role"] = roles[0] if len(roles) == 1 else None
+        token["full_name"] = user.full_name
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        # Borrado lógico: un usuario eliminado no puede iniciar sesión.
+        if getattr(self.user, "deleted_at", None):
+            raise AuthenticationFailed(
+                self.error_messages["no_active_account"], "no_active_account"
+            )
+
+        roles = _role_names(self.user)
+        data["roles"] = roles
+        data["active_role"] = roles[0] if len(roles) == 1 else None
+        data["full_name"] = self.user.full_name
+        return data

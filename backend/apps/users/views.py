@@ -1,10 +1,30 @@
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
-from .models import RoleName
+from .filters import UserFilter
+from .models import CustomUser, RoleName
+from .pagination import UserPagination
 from .permissions import IsAdminOrCommittee
-from .serializers import UserCreateSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer, UserListSerializer
+from .services.recaptcha import validate_recaptcha
+from .services.login_audit import is_locked_out, record_attempt
+
+
+class UserListView(generics.ListAPIView):
+    serializer_class = UserListSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrCommittee]
+    filterset_class = UserFilter
+    pagination_class = UserPagination
+    queryset = (
+        CustomUser.objects.filter(deleted_at__isnull=True)
+        .only("id", "email", "full_name", "affiliation", "is_active", "created_at")
+        .prefetch_related("roles")
+        .order_by("id")
+    )
 
 
 class UserRegisterView(generics.CreateAPIView):
@@ -39,3 +59,41 @@ class AdminUserCreateView(generics.CreateAPIView):
 
     serializer_class = UserCreateSerializer
     permission_classes = [IsAuthenticated, IsAdminOrCommittee]
+
+class LoginView(TokenObtainPairView):
+    """
+    POST /api/v1/auth/login/
+    Valida primero el token de reCAPTCHA en el servidor y solo entonces
+    verifica credenciales y emite los JWT (access + refresh).
+    """
+
+    serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        email = str(request.data.get("email", "")).strip().lower()
+        captcha_token = request.data.get("recaptcha_token")
+        remote_ip = request.META.get("REMOTE_ADDR")
+
+        if email and is_locked_out(email):
+            return Response(
+                {"detail": "Demasiados intentos fallidos. Inténtalo de nuevo en unos minutos."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        if not validate_recaptcha(captcha_token, remote_ip):
+            return Response(
+                {"detail": "Verificación CAPTCHA inválida o ausente."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            response = super().post(request, *args, **kwargs)
+        except (AuthenticationFailed, InvalidToken, TokenError):
+            if email:
+                record_attempt(email, remote_ip, False)
+            raise
+
+        record_attempt(email, remote_ip, True)
+        return response
