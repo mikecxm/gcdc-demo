@@ -94,6 +94,11 @@ if DB_NAME:
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432'),
+            # Reuse bounded PostgreSQL connections across concurrent HTTP threads.
+            'CONN_MAX_AGE': 0,
+            'OPTIONS': {
+                'pool': {'min_size': 4, 'max_size': 12, 'timeout': 10},
+            },
         }
     }
 else:
