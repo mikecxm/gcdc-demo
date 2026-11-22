@@ -58,10 +58,13 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 	const [pdfError, setPdfError] = useState<string | null>(null);
 	const [isDragging, setIsDragging] = useState(false);
 	const [isSuccess, setIsSuccess] = useState(false);
+	const [hasMoreFormContent, setHasMoreFormContent] = useState(false);
 	const [confirmedCoauthors, setConfirmedCoauthors] = useState<Set<string>>(() => new Set());
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const formScrollRef = useRef<HTMLDivElement>(null);
 	const successDialogRef = useRef<HTMLDivElement>(null);
 	const successCloseButtonRef = useRef<HTMLButtonElement>(null);
+	const submitButtonRef = useRef<HTMLButtonElement>(null);
 	const successDialogWasOpen = useRef(false);
 
 	const {
@@ -70,7 +73,6 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		handleSubmit,
 		trigger,
 		reset,
-		setFocus,
 		formState: { errors, isSubmitting, touchedFields, dirtyFields },
 	} = useForm<ArticleSubmissionValues>({
 		resolver: zodResolver(articleSubmissionSchema),
@@ -114,11 +116,50 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		isPdfValid,
 	].filter(Boolean).length;
 	const progressPercentage = Math.round((completedRequiredFields / 5) * 100);
+
+	useEffect(() => {
+		const scrollElement = formScrollRef.current;
+		if (!scrollElement) return;
+
+		const updateScrollHint = () => {
+			setHasMoreFormContent(
+				scrollElement.scrollTop + scrollElement.clientHeight < scrollElement.scrollHeight - 1
+			);
+		};
+		const routeWheelToForm = (event: WheelEvent) => {
+			if (isSuccess || scrollElement.contains(event.target as Node) || event.deltaY === 0) return;
+
+			const maxScrollTop = scrollElement.scrollHeight - scrollElement.clientHeight;
+			const canScrollDown = event.deltaY > 0 && scrollElement.scrollTop < maxScrollTop;
+			const canScrollUp = event.deltaY < 0 && scrollElement.scrollTop > 0;
+			if (!canScrollDown && !canScrollUp) return;
+
+			scrollElement.scrollTop += event.deltaY;
+			event.preventDefault();
+		};
+
+		updateScrollHint();
+		scrollElement.addEventListener('scroll', updateScrollHint, { passive: true });
+		window.addEventListener('resize', updateScrollHint);
+		window.addEventListener('wheel', routeWheelToForm, { passive: false });
+
+		const resizeObserver = new ResizeObserver(updateScrollHint);
+		resizeObserver.observe(scrollElement);
+		const formElement = scrollElement.querySelector('form');
+		if (formElement) resizeObserver.observe(formElement);
+
+		return () => {
+			scrollElement.removeEventListener('scroll', updateScrollHint);
+			window.removeEventListener('resize', updateScrollHint);
+			window.removeEventListener('wheel', routeWheelToForm);
+			resizeObserver.disconnect();
+		};
+	}, [isSuccess]);
+
 	useEffect(() => {
 		if (!isSuccess) {
 			if (successDialogWasOpen.current) {
-				setFocus('title');
-				window.scrollTo({ top: 0, behavior: 'instant' });
+				submitButtonRef.current?.focus();
 				successDialogWasOpen.current = false;
 			}
 			return;
@@ -132,7 +173,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		return () => {
 			document.body.style.overflow = previousOverflow;
 		};
-	}, [isSuccess, setFocus]);
+	}, [isSuccess]);
 
 	const closeSuccessDialog = () => {
 		reset();
@@ -143,6 +184,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		setIsDragging(false);
 		setIsSuccess(false);
 		if (fileInputRef.current) fileInputRef.current.value = '';
+		formScrollRef.current?.scrollTo({ top: 0 });
 	};
 
 	const handleSuccessDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -270,17 +312,17 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		}`;
 
 	return (
-		<main className="relative isolate flex min-h-[100dvh] w-full flex-col items-start bg-[#f2f4f5] xl:flex-row">
+		<main className="article-submission relative isolate flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#f2f4f5] lg:h-[100dvh] lg:flex-row">
 			<div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
 				<span className="absolute -left-72 top-[8%] h-[36rem] w-[36rem] rounded-full bg-blue-950" />
 				<span className="absolute left-[38%] top-[28%] h-72 w-72 rounded-full bg-indigo-200" />
 				<span className="absolute -right-48 bottom-[-9rem] h-[34rem] w-[34rem] rounded-full bg-slate-200" />
 			</div>
 
-			<section className="relative z-10 order-1 w-full min-w-0 px-3 py-3 sm:px-6 sm:py-6 xl:w-7/12 xl:px-8 xl:py-8">
-				<div className="relative mx-auto w-full max-w-3xl">
-					<div className="relative mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white/95 text-left">
-					<header className="relative z-20 border-b border-slate-200 bg-white px-5 py-5 sm:px-8 sm:py-6">
+			<section className="article-submission-panel relative z-10 order-1 h-[100dvh] w-full min-w-0 p-3 sm:p-5 lg:min-h-0 lg:w-7/12 lg:p-6 2xl:w-6/12 2xl:p-8">
+				<div className="relative mx-auto h-full min-h-0 w-full max-w-3xl">
+					<div className="relative mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white/95 text-left">
+					<header className="article-submission-header relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 py-5 sm:px-7 sm:py-6">
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 							<div className="min-w-0">
 								<button
@@ -319,7 +361,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 						</div>
 					</header>
 
-					<div className="min-w-0 px-5 pb-5 sm:px-8 sm:pb-8">
+					<div ref={formScrollRef} className="article-form-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-7 sm:pb-7">
 					<form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
 						<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
 							<div className="min-w-0">
@@ -631,6 +673,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 						{submissionError && <p role="alert" className="text-sm text-red-600">{submissionError}</p>}
 						<div className="flex justify-end border-t border-slate-200 pt-5">
 							<button
+								ref={submitButtonRef}
 								type="submit"
 								disabled={isSubmitting || isSuccess || !thematicLines.length || hasUnconfirmedCoauthors}
 										className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
@@ -641,21 +684,27 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 					</form>
 					</div>
 				</div>
+					{hasMoreFormContent && (
+						<div
+							aria-hidden="true"
+							className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 rounded-b-3xl bg-gradient-to-t from-indigo-600/20 via-indigo-500/5 to-transparent"
+						/>
+					)}
 				</div>
 			</section>
 
-			<aside className="sticky top-0 z-10 order-2 hidden h-[100dvh] w-5/12 min-w-0 flex-col items-center justify-center gap-4 px-6 py-6 xl:flex">
+			<aside className="article-submission-visual relative z-10 order-2 flex min-h-[44dvh] w-full min-w-0 flex-col items-center justify-center px-4 py-6 lg:min-h-0 lg:w-5/12 lg:px-6 lg:py-6 2xl:w-6/12">
 				<div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
 					<img
 						src={publishArticleAnimation}
 						alt=""
-						className="mb-4 max-h-[45dvh] w-full max-w-lg object-contain"
+						className="mb-2 max-h-[42dvh] w-64 max-w-full object-contain sm:w-80 lg:mb-4 lg:w-[90%] lg:max-w-2xl"
 					/>
 					<div className="visual-panel-copy min-w-0 max-w-2xl">
 						<p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
 							GCDC · Conferencia
 						</p>
-						<h2 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 2xl:text-4xl">
+						<h2 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-4xl 2xl:text-5xl">
 							Gestión Científica de Conferencia
 						</h2>
 						<p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-700 sm:text-base lg:text-lg">
