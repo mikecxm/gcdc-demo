@@ -20,14 +20,6 @@ body {
   width: 100%;
 }
 
-.article-form-scroll {
-  scrollbar-width: none;
-}
-
-.article-form-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 .visual-panel-copy {
   text-shadow: 0 1px 1px rgb(255 255 255 / 0.8);
 }
