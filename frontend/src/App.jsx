@@ -98,6 +98,10 @@ function App() {
     return <Navigate to="/login" replace />;
   }
 
+  if (currentView === 'workspace' && workspaceTab === 'articulos' && isSubmissionOpen && role === 'AUTOR') {
+    return <ArticleSubmissionForm onBackToMenu={() => navigateTo('workspace', 'articulos')} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative selection:bg-indigo-100 selection:text-indigo-900">
       {/* ========================================================
@@ -446,14 +450,10 @@ function App() {
             {/* Contenido dinámico según la pestaña activa */}
             <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
               {workspaceTab === 'articulos' && (
-                isSubmissionOpen && role === 'AUTOR' ? (
-                  <ArticleSubmissionForm onBackToMenu={() => setIsSubmissionOpen(false)} />
-                ) : (
                   <>
                     {role === 'AUTOR' && <div className="flex justify-end"><button type="button" onClick={() => setIsSubmissionOpen(true)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Postular artículo</button></div>}
                     <ArticleCatalogView />
                   </>
-                )
               )}
 
               {workspaceTab === 'usuarios' && (

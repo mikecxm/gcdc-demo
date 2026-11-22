@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import {
+	ArrowLeft,
 	Check,
 	CheckCircle2,
 	FileText,
@@ -324,7 +325,15 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 					<header className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 pb-5 pt-5 sm:px-8 sm:pb-5 sm:pt-8 lg:px-9 lg:pb-5 lg:pt-9">
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 							<div className="min-w-0">
-								<button type="button" onClick={onBackToMenu} disabled={isSubmitting || isSuccess} className="mb-3 text-sm font-semibold text-indigo-600 disabled:opacity-50">Volver al menú</button>
+								<button
+									type="button"
+									onClick={onBackToMenu}
+									disabled={isSubmitting || isSuccess}
+									className="mb-3 -ml-2 inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+								>
+									<ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
+									Artículos y Postulaciones
+								</button>
 								<h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Postular artículo</h1>
 								<p className="mt-1 text-sm text-slate-500">
 									Completa los metadatos y adjunta la versión inicial en PDF.
@@ -744,7 +753,8 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 						<p id="article-success-description" className="mt-4 text-sm leading-relaxed text-slate-600">
 							Tu artículo se guardó correctamente. Puedes subir otro artículo o volver al menú de Artículos y Postulaciones.
 						</p>
-						<div className="mt-6 flex flex-wrap justify-end gap-3"><button type="button" onClick={onBackToMenu} className="min-h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Volver al menú</button>
+						<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+							<button type="button" onClick={onBackToMenu} className="min-h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Volver a Artículos</button>
 							<button
 								type="button"
 								onClick={closeSuccessDialog}
