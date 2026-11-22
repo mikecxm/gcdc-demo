@@ -322,6 +322,17 @@ export const getArticleById = async (id: number, signal?: AbortSignal): Promise<
   return response.data;
 };
 
+/** Descarga autenticada; nunca interpreta una ruta de almacenamiento como URL pública. */
+export const getArticlePdf = async (id: number, signal?: AbortSignal): Promise<Blob> => {
+  const { data } = await apiClient.get<Blob>(`/articles/${id}/pdf/`, {
+    responseType: 'blob', signal,
+  });
+  if (data.type.split(';')[0] !== 'application/pdf' || await data.slice(0, 5).text() !== '%PDF-') {
+    throw new Error('El servidor no devolvió un documento PDF válido.');
+  }
+  return data;
+};
+
 export interface DisableArticleResponse {
   id: number;
   status: ArticleStatus;
