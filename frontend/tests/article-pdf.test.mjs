@@ -2,12 +2,12 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
-let vite, apiClient, getArticlePdf;
+let vite, apiClient, getArticlePdf, uploadArticleVersion;
 before(async () => {
   globalThis.localStorage = { getItem: () => 'session-token' };
   vite = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
   ({ apiClient } = await vite.ssrLoadModule('/src/services/api.ts'));
-  ({ getArticlePdf } = await vite.ssrLoadModule('/src/services/articlesApi.ts'));
+  ({ getArticlePdf, uploadArticleVersion } = await vite.ssrLoadModule('/src/services/articlesApi.ts'));
 });
 after(async () => { await vite?.close(); delete globalThis.localStorage; });
 
@@ -35,4 +35,27 @@ test('HTML application response is rejected instead of embedded as a manuscript'
 test('backend failure propagates to the viewer error state', async () => {
   apiClient.defaults.adapter = async () => { throw new Error('PDF unavailable'); };
   await assert.rejects(getArticlePdf(12), /PDF unavailable/);
+});
+
+test('multipart version upload sends FormData with a generated boundary', async () => {
+  const formData = new FormData();
+  formData.append('pdf', new Blob(['%PDF-1.4\nexample'], { type: 'application/pdf' }), 'article.pdf');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    assert.match(request.headers.get('Content-Type') ?? '', /^multipart\/form-data; boundary=/i);
+    assert.equal(request.headers.get('Authorization'), 'Bearer session-token');
+    assert.match(request.url, /\/api\/v1\/articles\/12\/versions\/$/);
+    assert.equal((await request.formData()).get('pdf')?.name, 'article.pdf');
+    return new Response(
+      JSON.stringify({ id: 8, version_number: 2, stage: 'INICIAL', uploaded_at: '2026-11-22T00:00:00Z' }),
+      { status: 201, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+  apiClient.defaults.adapter = 'fetch';
+  try {
+    await uploadArticleVersion(12, formData);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import {
   AlertCircle,
@@ -10,7 +10,12 @@ import {
   Upload,
 } from 'lucide-react';
 import type { Article, ArticleVersion } from '../../types/article';
-import { getArticleVersions, replaceArticlePdf } from '../../services/articlesApi';
+import {
+  getArticleApiErrorMessage,
+  getArticlePdf,
+  getArticleVersions,
+  uploadArticleVersion,
+} from '../../services/articlesApi';
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024;
 const MOCK_ARTICLE_IDS = new Set([101, 102, 103]);
@@ -25,29 +30,30 @@ interface PdfVersionManagerProps {
   onLocalVersionsChange: (versions: ArticleVersion[]) => void;
 }
 
-const getApiError = (error: unknown): string => {
-  if (isAxiosError<{ detail?: string }>(error)) {
-    return error.response?.data?.detail ?? 'No fue posible comunicarse con el servidor.';
-  }
-  return error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
-};
+const getApiError = (error: unknown): string => getArticleApiErrorMessage(error);
 
 const isPastDeadline = (deadline: string): boolean => {
-  const date = new Date(`${deadline.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return true;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today > date;
+  const deadlineDate = deadline.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadlineDate)) return true;
+  const todayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type: string) => todayParts.find((value) => value.type === type)?.value;
+  const today = `${part('year')}-${part('month')}-${part('day')}`;
+  return today > deadlineDate;
 };
 
 const getUrlFileName = (url: string): string | undefined =>
   decodeURIComponent(url.split('/').pop()?.split(/[?#]/)[0] ?? '') || undefined;
 
-const getFileName = (version: ArticleVersion): string => {
+const getFileName = (version: ArticleVersion, articleId: number): string => {
   if (version.file_name) return version.file_name;
   return (
     (version.pdf_url && getUrlFileName(version.pdf_url)) ??
-    `Manuscrito-v${version.version_number}.pdf`
+    `article-${articleId}-v${version.version_number}.pdf`
   );
 };
 
@@ -66,15 +72,31 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [fileActionError, setFileActionError] = useState<string | null>(null);
   const [simulateExpired, setSimulateExpired] = useState(false);
+  const createdObjectUrls = useRef(new Set<string>());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isMockArticle = MOCK_ARTICLE_IDS.has(article.id);
   const deadline = article.submission_deadline ?? (isMockArticle ? MOCK_DEADLINE : undefined);
   const deadlineExpired = deadline ? isPastDeadline(deadline) : false;
-  const isUploadBlocked = !deadline || deadlineExpired || simulateExpired;
+  const articleAcceptsPdf = article.is_enabled && article.status === 'POSTULADO';
+  const isUploadBlocked =
+    !deadline || deadlineExpired || simulateExpired || !articleAcceptsPdf;
+
+  useEffect(() => {
+    const objectUrls = createdObjectUrls.current;
+    return () => {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
+    };
+  }, [article.id]);
 
   useEffect(() => {
     let isCurrent = true;
+    setIsLoadingHistory(true);
+    setApiVersions([]);
+    setHistoryError(null);
     getArticleVersions(article.id, token ?? undefined)
       .then((versions) => {
         if (isCurrent) setApiVersions(versions);
@@ -140,6 +162,45 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
     setSelectedFile(file);
   };
 
+  const getVersionPdfUrl = async (version: ArticleVersion): Promise<string> => {
+    if (version.pdf_url) return version.pdf_url;
+    const pdf = await getArticlePdf(article.id, undefined, version.version_number);
+    const url = URL.createObjectURL(pdf);
+    createdObjectUrls.current.add(url);
+    return url;
+  };
+
+  const handleOpenVersion = async (version: ArticleVersion) => {
+    setFileActionError(null);
+    const previewWindow = window.open('about:blank', '_blank');
+    if (!previewWindow) {
+      setFileActionError('Permite las ventanas emergentes para abrir el PDF.');
+      return;
+    }
+    previewWindow.opener = null;
+    try {
+      previewWindow.location.href = await getVersionPdfUrl(version);
+    } catch (error) {
+      previewWindow.close();
+      setFileActionError(getApiError(error));
+    }
+  };
+
+  const handleDownloadVersion = async (version: ArticleVersion) => {
+    setFileActionError(null);
+    try {
+      const url = await getVersionPdfUrl(version);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = getFileName(version, article.id);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      setFileActionError(getApiError(error));
+    }
+  };
+
   const handleReplace = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedFile || isUploadBlocked || isUploading) return;
@@ -149,9 +210,15 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
     setSuccessMessage(null);
     try {
       let responseVersion: ArticleVersion | undefined;
+      const formData = new FormData();
+      formData.append('pdf', selectedFile);
       try {
-        const response = await replaceArticlePdf(article.id, selectedFile, token ?? undefined);
-        if (response.status !== 200 && response.status !== 201) {
+        const response = await uploadArticleVersion(
+          article.id,
+          formData,
+          token ?? undefined
+        );
+        if (response.status !== 201) {
           throw new Error(`El servidor respondió con estado ${response.status}.`);
         }
         responseVersion = response.data;
@@ -190,6 +257,7 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
       }
 
       const newPdfUrl = URL.createObjectURL(selectedFile);
+      createdObjectUrls.current.add(newPdfUrl);
       nextVersions.push({
         id: responseVersion?.id ?? -Date.now(),
         version_number: newVersionNumber,
@@ -202,6 +270,39 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
       onCurrentPdfUrlChange(newPdfUrl);
       setSelectedFile(null);
       setSuccessMessage(`El manuscrito se reemplazó correctamente (versión ${newVersionNumber}).`);
+
+      if (responseVersion) {
+        const [historyResult, pdfResult] = await Promise.allSettled([
+          getArticleVersions(article.id, token ?? undefined),
+          getArticlePdf(article.id, undefined, newVersionNumber),
+        ]);
+        if (historyResult.status === 'fulfilled') {
+          setApiVersions(historyResult.value);
+          setHistoryError(null);
+        } else {
+          setHistoryError(
+            `La versión se subió, pero no se pudo actualizar el historial: ${getApiError(historyResult.reason)}`
+          );
+        }
+        if (pdfResult.status === 'fulfilled') {
+          const refreshedPdfUrl = URL.createObjectURL(pdfResult.value);
+          createdObjectUrls.current.add(refreshedPdfUrl);
+          URL.revokeObjectURL(newPdfUrl);
+          createdObjectUrls.current.delete(newPdfUrl);
+          onCurrentPdfUrlChange(refreshedPdfUrl);
+          onLocalVersionsChange(
+            nextVersions.map((version) =>
+              version.version_number === newVersionNumber
+                ? { ...version, pdf_url: refreshedPdfUrl }
+                : version
+            )
+          );
+        } else {
+          setUploadError(
+            `La versión se subió, pero no se pudo actualizar el visor: ${getApiError(pdfResult.reason)}`
+          );
+        }
+      }
     } catch (error) {
       setUploadError(getApiError(error));
     } finally {
@@ -232,6 +333,11 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <p>El plazo para reemplazar el manuscrito ya venció. La carga de una nueva versión está bloqueada.</p>
         </div>
+      ) : !articleAcceptsPdf ? (
+        <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <p>El artículo no está activo o ya no está en estado POSTULADO; no admite cambios de PDF.</p>
+        </div>
       ) : !deadline ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
           No es posible confirmar si el plazo está vigente; la carga permanece bloqueada.
@@ -246,25 +352,29 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
             if (!isUploading) handleFile(event.dataTransfer.files[0]);
           }}
         >
-          <label
-            htmlFor={`pdf-replacement-${article.id}`}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-describedby={`pdf-replacement-hint-${article.id}`}
             className={`flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-3 py-4 text-center text-xs transition-colors ${
               isUploadBlocked || isUploading
                 ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
                 : 'border-indigo-300 text-slate-600 hover:bg-indigo-50'
             }`}
+            disabled={isUploadBlocked || isUploading}
           >
             <Upload className="h-5 w-5 text-indigo-500" />
             <span className="break-all font-medium">
               {selectedFile?.name ?? 'Selecciona o arrastra aquí el nuevo PDF'}
             </span>
-            <span>Formato .pdf · máximo 10 MB</span>
-          </label>
+            <span id={`pdf-replacement-hint-${article.id}`}>Formato .pdf · máximo 10 MB</span>
+          </button>
           <input
+            ref={fileInputRef}
             id={`pdf-replacement-${article.id}`}
             type="file"
             accept=".pdf,application/pdf"
-            className="sr-only"
+            className="hidden"
             disabled={isUploadBlocked || isUploading}
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
@@ -308,6 +418,11 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
           {successMessage}
         </p>
       )}
+      {fileActionError && (
+        <p className="break-words rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
+          {fileActionError}
+        </p>
+      )}
 
       <div className="min-w-0 space-y-2">
         <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Versiones anteriores</h4>
@@ -323,8 +438,7 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
           <p className="rounded-lg bg-white p-3 text-xs text-slate-500">Aún no hay versiones registradas.</p>
         )}
         {versions.map((version) => {
-          const fileUrl = version.pdf_url;
-          const fileName = getFileName(version);
+          const fileName = getFileName(version, article.id);
           return (
             <div
               key={`${version.version_number}-${version.id}`}
@@ -341,31 +455,24 @@ export const PdfVersionManager: React.FC<PdfVersionManagerProps> = ({
                     : new Date(version.uploaded_at).toLocaleString('es-CO')}
                 </p>
               </div>
-              {fileUrl ? (
-                <div className="flex flex-wrap gap-3 text-xs font-semibold">
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Abrir PDF
-                  </a>
-                  <a
-                    href={fileUrl}
-                    download={fileName}
-                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Descargar
-                  </a>
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-400">
-                  El servidor no proporcionó el enlace del PDF
-                </span>
-              )}
+              <div className="flex flex-wrap gap-3 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => void handleOpenVersion(version)}
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Abrir PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadVersion(version)}
+                  className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Descargar
+                </button>
+              </div>
             </div>
           );
         })}

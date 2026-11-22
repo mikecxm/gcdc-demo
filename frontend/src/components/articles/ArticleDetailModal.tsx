@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { Article } from '../../types/article';
+import type { Article, ArticleVersion } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
 import { useAuth } from '../../context/SessionContext';
 import { getArticleApiErrorMessage, getArticleById, getArticlePdf } from '../../services/articlesApi';
 import PdfViewer from './PdfViewer';
+import { PdfVersionManager } from './PdfVersionManager';
 import { DisableArticleModal } from './DisableArticleModal';
 import {
   X,
@@ -42,6 +43,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     message: string;
   } | null>(null);
   const [detailAttempt, setDetailAttempt] = useState(0);
+  const [localVersions, setLocalVersions] = useState<ArticleVersion[]>([]);
   const selectedArticleId = selectedArticle?.id;
   const article =
     fetchedArticle?.id === selectedArticle?.id ? fetchedArticle : selectedArticle;
@@ -52,6 +54,10 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
       ? detailError.message
       : null;
   const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
+
+  useEffect(() => {
+    setLocalVersions([]);
+  }, [selectedArticleId]);
 
   useEffect(() => {
     if (!isOpen || selectedArticleId === undefined) return;
@@ -385,6 +391,20 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
             </div>
           ) : pdfUrl ? <PdfViewer key={pdfUrl} pdfUrl={pdfUrl} title={article.title} /> : (
             <p role="status" className="py-6 text-sm text-slate-500">Cargando manuscrito PDF...</p>
+          )}
+
+          {role === 'AUTOR' && (
+            <PdfVersionManager
+              article={article}
+              token={session?.accessToken ?? null}
+              currentPdfUrl={pdfUrl ?? ''}
+              localVersions={localVersions}
+              onCurrentPdfUrlChange={(url) => {
+                setPdfResource({ articleId: article.id, url });
+                setPdfError(null);
+              }}
+              onLocalVersionsChange={setLocalVersions}
+            />
           )}
         </div>
 
