@@ -34,7 +34,7 @@ export const DisableArticleModal: React.FC<DisableArticleModalProps> = ({
     onClose();
   }, [isSubmitting, onClose]);
 
-  // Manejo de la tecla Escape y bloqueo de scroll
+  // Manejo de la tecla Escape; el modal padre controla el bloqueo de scroll.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -45,12 +45,9 @@ export const DisableArticleModal: React.FC<DisableArticleModalProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, isSubmitting, handleClose]);
 
