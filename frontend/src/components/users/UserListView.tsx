@@ -87,7 +87,7 @@ export const UserListView = ({
 				setUsers([]);
 				const status = axios.isAxiosError(error) ? error.response?.status : undefined;
 				setLoadError(status === 403
-					? 'El directorio requiere una cuenta con rol de administrador o comité.'
+					? 'El servidor rechazó el acceso al directorio. Intenta iniciar sesión de nuevo.'
 					: status === 401
 						? 'Tu sesión venció. Inicia sesión de nuevo para consultar el directorio.'
 						: 'No pudimos cargar los usuarios. Intenta de nuevo o contacta al administrador.');

@@ -16,7 +16,7 @@ from .services.login_audit import is_locked_out, record_attempt
 
 class UserListView(generics.ListAPIView):
     serializer_class = UserListSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrCommittee]
+    permission_classes = [IsAuthenticated]
     filterset_class = UserFilter
     pagination_class = UserPagination
     queryset = (

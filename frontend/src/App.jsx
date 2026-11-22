@@ -458,15 +458,10 @@ function App() {
               )}
 
               {workspaceTab === 'usuarios' && (
-                canManageUsers ? <>
-                  <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>
+                <>
+                  {canManageUsers && <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>}
                   <UserListView key={lastCreatedUser?.id ?? 'directory'} embedded loadUsers={loadConfiguredUsers} />
-                </> : (
-                  <section className="rounded-xl border border-slate-200 bg-white p-6">
-                    <h1 className="text-xl font-semibold text-slate-900">Directorio de usuarios</h1>
-                    <p className="mt-2 text-sm text-slate-600">El directorio de la plataforma está disponible para administradores y miembros del comité. Tu cuenta de autor está registrada, pero este rol no tiene permiso para consultar el listado.</p>
-                  </section>
-                )
+                </>
               )}
             </main>
 
