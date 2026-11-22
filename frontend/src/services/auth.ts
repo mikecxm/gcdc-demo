@@ -17,3 +17,27 @@ export async function login(email: string, password: string, recaptchaToken: str
   });
   return data;
 }
+
+
+
+export async function requestPasswordResetPin(email: string) {
+  const { data } = await apiClient.post(
+    "/auth/password-reset/request/",
+    { email }
+  );
+
+  return data;
+}
+
+export async function confirmPasswordReset(data: {
+  email: string;
+  pin: string;
+  new_password: string;
+}) {
+  const { data: response } = await apiClient.post(
+    "/auth/password-reset/confirm/",
+    data
+  );
+
+  return response;
+}

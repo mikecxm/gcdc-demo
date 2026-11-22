@@ -2,31 +2,42 @@ import { useRef, useState, type FormEvent } from "react";
 import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { login } from "../../services/auth";
+import {
+  login,
+  requestPasswordResetPin,
+  confirmPasswordReset,
+} from "../../services/auth";
 import { useAuth, type Role } from "../../context/SessionContext";
 import RoleSelectorModal from "./RoleSelectorModal";
+import { PasswordRecoveryWizard } from "../users/PasswordRecoveryWizard";
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const data: unknown = err.response?.data;
+
     if (typeof data === "object" && data !== null) {
       const payload = data as Record<string, unknown>;
       const detail = payload.detail ?? payload.non_field_errors;
+
       if (typeof detail === "string") return detail;
+
       if (Array.isArray(detail)) {
-        const messages = detail.filter((item): item is string => typeof item === "string");
+        const messages = detail.filter(
+          (item): item is string => typeof item === "string"
+        );
         if (messages.length) return messages.join(", ");
       }
     }
 
     const status = err.response?.status;
     if (status === 400) return "Verificación CAPTCHA inválida. Inténtalo de nuevo.";
-    if (status === 401) return "Correo o contraseña incorrectos."; // mensaje genérico
+    if (status === 401) return "Correo o contraseña incorrectos.";
     if (status === 429) return "Demasiados intentos. Espera unos minutos.";
     if (!err.response) return "No se pudo conectar con el servidor.";
   }
+
   return "Ocurrió un error. Inténtalo de nuevo.";
 }
 
@@ -44,20 +55,34 @@ export default function LoginView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Role[] | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
+if (showRecovery) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <PasswordRecoveryWizard
+        onRequestPin={requestPasswordResetPin}
+        onResetPassword={confirmPasswordReset}
+        onBack={() => setShowRecovery(false)}
+      />
+    </main>
+  );
+}
+
   const resetCaptcha = () => {
-    recaptchaRef.current?.reset(); // el token de reCAPTCHA es de un solo uso
+    recaptchaRef.current?.reset();
     setCaptchaToken(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!captchaToken) return; // protección extra: el botón ya está deshabilitado
+    if (!captchaToken) return;
 
     setLoading(true);
     setError(null);
+
     try {
       const data = await login(email.trim(), password, captchaToken);
       const responseRoles = Array.isArray(data.roles) ? data.roles : [];
@@ -170,6 +195,15 @@ export default function LoginView() {
         >
           {loading ? "Ingresando..." : "Ingresar"}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setShowRecovery(true)}
+          className="w-full text-sm text-blue-600 hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </button>
+
         <p className="text-center text-sm text-gray-600">
           ¿Aún no tienes cuenta?{" "}
           <Link to="/#registro" className="font-medium text-blue-600 hover:underline">
