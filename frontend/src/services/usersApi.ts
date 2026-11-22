@@ -12,7 +12,6 @@ function isUser(value: unknown): value is UserResponse {
     user.roles.every((role) => ['ADMIN', 'COMITE', 'AUTOR'].includes(role));
 }
 
-// The list route is configured only after the backend owner confirms it.
 // Supports a full array or DRF pagination; loads all pages for client pagination.
 export function createUserListLoader(endpoint: string): UserListLoader {
   return async (signal) => {
@@ -43,4 +42,4 @@ export function createUserListLoader(endpoint: string): UserListLoader {
   };
 }
 
-export const loadConfiguredUsers = createUserListLoader(import.meta.env.VITE_USERS_LIST_PATH ?? '');
+export const loadConfiguredUsers = createUserListLoader(import.meta.env.VITE_USERS_LIST_PATH?.trim() || 'users/');

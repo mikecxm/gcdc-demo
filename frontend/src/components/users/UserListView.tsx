@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import {
 	Building2,
 	ChevronLeft,
@@ -81,10 +82,15 @@ export const UserListView = ({
 		setLoadError(null);
 		loadUsers(controller.signal).then((result) => {
 			if (!controller.signal.aborted) setUsers(result);
-		}).catch(() => {
+		}).catch((error: unknown) => {
 			if (!controller.signal.aborted) {
 				setUsers([]);
-				setLoadError('No pudimos cargar los usuarios. Intenta de nuevo o contacta al administrador.');
+				const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+				setLoadError(status === 403
+					? 'El servidor rechazó el acceso al directorio. Intenta iniciar sesión de nuevo.'
+					: status === 401
+						? 'Tu sesión venció. Inicia sesión de nuevo para consultar el directorio.'
+						: 'No pudimos cargar los usuarios. Intenta de nuevo o contacta al administrador.');
 			}
 		}).finally(() => {
 			if (!controller.signal.aborted) setIsLoading(false);

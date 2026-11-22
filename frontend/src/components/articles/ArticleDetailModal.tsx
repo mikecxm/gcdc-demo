@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import type { Article } from '../../types/article';
 import { getStatusBadgeConfig } from '../../types/article';
 import { useAuth } from '../../context/SessionContext';
-import { getArticleApiErrorMessage, getArticleById } from '../../services/articlesApi';
+import { getArticleApiErrorMessage, getArticleById, getArticlePdf } from '../../services/articlesApi';
+import PdfViewer from './PdfViewer';
 import { DisableArticleModal } from './DisableArticleModal';
 import {
   X,
@@ -16,131 +17,8 @@ import {
   Tag,
   ShieldCheck,
   ShieldAlert,
-  AlertTriangle,
   Download,
 } from 'lucide-react';
-
-// ─── Componente interno: Visor PDF robusto multi-browser ───────────────────────
-// Estrategia en cascada:
-//   1. <object> con type="application/pdf" (Chrome, Edge, Firefox nativo)
-//   2. <embed> como fallback interno de <object>
-//   3. Mensaje con enlace de descarga como último recurso
-// Se evita <iframe> solo porque algunos browsers lo bloquean para PDFs
-// con cabeceras Content-Disposition: attachment (descarga forzada).
-interface PdfViewerProps {
-  pdfUrl: string;
-  title: string;
-}
-
-const PdfViewer: React.FC<PdfViewerProps> = ({ pdfUrl, title }) => {
-  const [viewerError, setViewerError] = useState<boolean>(false);
-
-  // Recarga si cambia el PDF
-  useEffect(() => {
-    setViewerError(false);
-  }, [pdfUrl]);
-
-  return (
-    <div className="space-y-3 pt-2">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-slate-500" />
-          Manuscrito Adjunto (Visor de PDF)
-        </h3>
-        <a
-          href={pdfUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline self-start sm:self-auto"
-        >
-          <span>Abrir en pestaña nueva</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner">
-        {viewerError ? (
-          /* Fallback manual cuando el visor falla */
-          <div className="flex flex-col items-center justify-center gap-4 h-48 p-6 text-center">
-            <AlertTriangle className="w-10 h-10 text-amber-400" />
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-700">
-                El visor integrado no pudo renderizar el PDF
-              </p>
-              <p className="text-xs text-slate-500">
-                Esto puede ocurrir por restricciones del navegador o del servidor de origen.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-1.5"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Abrir en nueva pestaña
-              </a>
-              <a
-                href={pdfUrl}
-                download
-                className="px-4 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors inline-flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Descargar PDF
-              </a>
-            </div>
-          </div>
-        ) : (
-          /*
-           * <object> es el estándar recomendado para PDF embebido:
-           *   - Chrome/Edge: renderiza con el plugin PDF nativo
-           *   - Firefox: renderiza con pdf.js nativo
-           *   - Safari: renderiza con el motor WebKit
-           * El <embed> interno actúa como fallback para navegadores más antiguos.
-           * onError dispara el estado de error para mostrar el mensaje manual.
-           */
-          <object
-            data={pdfUrl}
-            type="application/pdf"
-            className="w-full h-80 sm:h-96 md:h-[480px]"
-            aria-label={`Manuscrito PDF: ${title}`}
-            onError={() => setViewerError(true)}
-          >
-            {/* Fallback nivel 2: <embed> */}
-            <embed
-              src={pdfUrl}
-              type="application/pdf"
-              className="w-full h-80 sm:h-96 md:h-[480px]"
-              onError={() => setViewerError(true)}
-            />
-            {/* Fallback nivel 3: texto con enlace */}
-            <div className="flex flex-col items-center justify-center gap-3 h-48 p-6 text-center">
-              <AlertTriangle className="w-8 h-8 text-amber-400" />
-              <p className="text-xs text-slate-500">
-                Tu navegador no soporta la visualización directa de PDF.{' '}
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 font-semibold underline"
-                >
-                  Haz clic aquí para ver o descargar el documento.
-                </a>
-              </p>
-            </div>
-          </object>
-        )}
-      </div>
-      <p className="text-[11px] text-slate-400 italic">
-        * El documento se muestra en modo de solo lectura para la revisión del Comité Científico. Si
-        el visor no carga, usa los botones de la barra inferior para abrirlo o descargarlo.
-      </p>
-    </div>
-  );
-};
-
-// ────────────────────────────────────────────────────────────────────────────────
 
 interface ArticleDetailModalProps {
   article: Article | null;
@@ -233,6 +111,28 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     };
   }, [isOpen]);
 
+  const [pdfResource, setPdfResource] = useState<{ articleId: number; url: string } | null>(null);
+  const [pdfError, setPdfError] = useState<{ articleId: number; message: string } | null>(null);
+  useEffect(() => {
+    if (!isOpen || selectedArticleId === undefined) return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    getArticlePdf(selectedArticleId, controller.signal).then((blob) => {
+      if (controller.signal.aborted) return;
+      objectUrl = URL.createObjectURL(blob);
+      setPdfResource({ articleId: selectedArticleId, url: objectUrl });
+      setPdfError(null);
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) setPdfError({ articleId: selectedArticleId, message: getArticleApiErrorMessage(error) });
+    });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setPdfResource(null);
+      setPdfError(null);
+    };
+  }, [isOpen, selectedArticleId, detailAttempt]);
+
   if (!isOpen || !article) {
     return null;
   }
@@ -256,7 +156,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   const keywordsList = article.keywords
     ? article.keywords.split(',').map((k) => k.trim())
     : [];
-  const pdfUrl = article.pdf_url;
+  const pdfUrl = pdfResource?.articleId === article.id ? pdfResource.url : undefined;
 
   return (
     <>
@@ -479,7 +379,14 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
             )}
           </div>
 
-          <PdfViewer pdfUrl={article.pdf_url} title={article.title} />
+          {pdfError?.articleId === article.id ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>{pdfError.message}</p>
+              <button type="button" onClick={() => { setPdfError(null); setPdfResource(null); setDetailAttempt((attempt) => attempt + 1); }} className="mt-2 font-semibold underline">Reintentar carga del PDF</button>
+            </div>
+          ) : pdfUrl ? <PdfViewer key={pdfUrl} pdfUrl={pdfUrl} title={article.title} /> : (
+            <p role="status" className="py-6 text-sm text-slate-500">Cargando manuscrito PDF...</p>
+          )}
         </div>
 
         {/* Footer del Modal */}
@@ -504,7 +411,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
             <a
-              href={article.pdf_url}
+              href={pdfUrl}
               download
               className="px-4 py-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors inline-flex items-center justify-center gap-1.5"
             >
