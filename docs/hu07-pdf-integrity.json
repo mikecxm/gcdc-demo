@@ -1,0 +1,47 @@
+{
+  "uploaded": 4,
+  "recovered": 4,
+  "recovery_percent": 100,
+  "samples": [
+    {
+      "bytes": 1024,
+      "upload_ms": 20.69849999861617,
+      "upload_status": 201,
+      "download_status": 200,
+      "source_md5": "142d71a2c2b9b67933549ed7eaccef39",
+      "download_md5": "142d71a2c2b9b67933549ed7eaccef39",
+      "source_sha256": "29037e47871af4378b5f3f036e68e56ef7588af17c7ed03b278fc9db7f5d93a5",
+      "download_sha256": "29037e47871af4378b5f3f036e68e56ef7588af17c7ed03b278fc9db7f5d93a5"
+    },
+    {
+      "bytes": 9900000,
+      "upload_ms": 66.56520000069577,
+      "upload_status": 201,
+      "download_status": 200,
+      "source_md5": "4ababe6442ada9b127b92ae109cad09b",
+      "download_md5": "4ababe6442ada9b127b92ae109cad09b",
+      "source_sha256": "f11a90efa19612f9e0beb573bbbfca09747883b1e39c553a7cc70e7b8ddbb84a",
+      "download_sha256": "f11a90efa19612f9e0beb573bbbfca09747883b1e39c553a7cc70e7b8ddbb84a"
+    },
+    {
+      "bytes": 10380902,
+      "upload_ms": 63.875100000586826,
+      "upload_status": 201,
+      "download_status": 200,
+      "source_md5": "6ef0b27da48ec4621fc07ba453aa84b0",
+      "download_md5": "6ef0b27da48ec4621fc07ba453aa84b0",
+      "source_sha256": "dd23ec896e6c6a09617c194d691d45a2e5f36b45049e3a5305f605038e169e88",
+      "download_sha256": "dd23ec896e6c6a09617c194d691d45a2e5f36b45049e3a5305f605038e169e88"
+    },
+    {
+      "bytes": 10485760,
+      "upload_ms": 69.7546000010334,
+      "upload_status": 201,
+      "download_status": 200,
+      "source_md5": "105d3be56fb9b6081374f9419b3ff19a",
+      "download_md5": "105d3be56fb9b6081374f9419b3ff19a",
+      "source_sha256": "972c9979b6c15426c2f193beb7393c304da1b892d0acc4f20b3ce2968953ef8e",
+      "download_sha256": "972c9979b6c15426c2f193beb7393c304da1b892d0acc4f20b3ce2968953ef8e"
+    }
+  ]
+}

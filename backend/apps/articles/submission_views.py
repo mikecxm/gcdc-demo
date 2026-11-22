@@ -43,6 +43,10 @@ class ArticleSubmissionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        # Finish reading multipart before replying: large clients may otherwise
+        # wait for the connection to close after an early deadline rejection.
+        # Check the clock after receiving the upload, before storing any data.
+        payload = request.data
         conference = Conference.objects.order_by("-event_start_date").first()
         if conference is None:
             return Response(
@@ -57,7 +61,7 @@ class ArticleSubmissionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = ArticleSubmissionSerializer(data=request.data)
+        serializer = ArticleSubmissionSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 

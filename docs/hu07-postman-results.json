@@ -1,0 +1,18 @@
+[
+  {
+    "bogota": "2030-06-30T23:59:59-05:00",
+    "expected_status": 201,
+    "actual_status": 201,
+    "requests": 2,
+    "assertions": 4,
+    "failures": 0
+  },
+  {
+    "bogota": "2030-07-01T00:00:01-05:00",
+    "expected_status": 400,
+    "actual_status": 400,
+    "requests": 1,
+    "assertions": 1,
+    "failures": 0
+  }
+]

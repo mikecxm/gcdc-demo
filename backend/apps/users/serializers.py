@@ -7,6 +7,17 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import CustomUser, Role, RoleName, UserRole
 
 
+class UserListSerializer(serializers.ModelSerializer):
+    roles = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name")
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id", "email", "full_name", "affiliation", "roles", "is_active", "created_at",
+        ]
+        read_only_fields = fields
+
+
 class UserPublicSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
 

@@ -1,0 +1,7 @@
+{
+  "name": "gcdc-submission-qa",
+  "private": true,
+  "devDependencies": {
+    "newman": "6.2.3"
+  }
+}

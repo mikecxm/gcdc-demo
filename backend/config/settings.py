@@ -49,6 +49,10 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'users.CustomUser'
 
+# Supabase remains the default; local QA can use real files without cloud keys.
+ARTICLE_PDF_STORAGE_BACKEND = config('ARTICLE_PDF_STORAGE_BACKEND', default='supabase')
+ARTICLE_PDF_ROOT = BASE_DIR / 'media' / 'article-pdfs'
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -94,6 +98,11 @@ if DB_NAME:
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432'),
+            # Reuse bounded PostgreSQL connections across concurrent HTTP threads.
+            'CONN_MAX_AGE': 0,
+            'OPTIONS': {
+                'pool': {'min_size': 4, 'max_size': 12, 'timeout': 10},
+            },
         }
     }
 else:

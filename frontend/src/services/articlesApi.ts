@@ -2,13 +2,10 @@ import axios from 'axios';
 import { apiClient } from './api';
 import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
 
-export const THEMATIC_LINES: string[] = [
-  'Inteligencia Artificial',
-  'Ingeniería de Software',
-  'Sistemas Distribuidos',
-  'Ciberseguridad',
-  'Ciencia de Datos',
-];
+export interface ThematicLine {
+  id: number;
+  name: string;
+}
 
 export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
   { value: 'POSTULADO', label: 'Postulado' },
@@ -258,6 +255,28 @@ export const getArticleVersions = async (
     `/articles/${articleId}/versions/`,
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
   );
+  return response.data;
+};
+
+export const getThematicLines = async (
+  signal?: AbortSignal
+): Promise<ThematicLine[]> => {
+  const response = await apiClient.get<ThematicLine[]>(
+    '/conferences/thematic-lines/',
+    { signal }
+  );
+
+  if (
+    !Array.isArray(response.data) ||
+    !response.data.every(
+      (line) =>
+        typeof line.id === 'number' &&
+        typeof line.name === 'string'
+    )
+  ) {
+    throw new Error('El servidor devolvió un formato de líneas temáticas no válido.');
+  }
+
   return response.data;
 };
 

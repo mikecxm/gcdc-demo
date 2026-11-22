@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   getArticleApiErrorMessage,
   getArticles,
-  THEMATIC_LINES,
+  getThematicLines,
   ARTICLE_STATUSES,
 } from '../services/articlesApi';
 import type { Article, ArticleStatus } from '../types/article';
+import type { ThematicLine } from '../services/articlesApi';
 import { getStatusBadgeConfig } from '../types/article';
 import { ArticleDetailModal } from '../components/articles/ArticleDetailModal';
 import {
@@ -29,6 +30,9 @@ const isArticleStatus = (value: string): value is ArticleStatus =>
 export const ArticleCatalogView: React.FC = () => {
   // Estados de datos
   const [allArticles, setAllArticles] = useState<Article[]>([]);
+  const [thematicLines, setThematicLines] = useState<ThematicLine[]>([]);
+  const [isLoadingThematicLines, setIsLoadingThematicLines] = useState<boolean>(true);
+  const [thematicLinesError, setThematicLinesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +48,30 @@ export const ArticleCatalogView: React.FC = () => {
     articleId: number;
     message: string;
   } | null>(null);
+
+  const loadThematicLines = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setThematicLines(await getThematicLines(signal));
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error('Error al cargar líneas temáticas:', err);
+      setThematicLinesError(getArticleApiErrorMessage(err));
+    } finally {
+      if (!signal?.aborted) setIsLoadingThematicLines(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => void loadThematicLines(controller.signal),
+      0
+    );
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadThematicLines]);
 
   const loadArticles = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -219,12 +247,17 @@ export const ArticleCatalogView: React.FC = () => {
                 id="filter-thematic-line"
                 value={selectedThematicLine}
                 onChange={(e) => setSelectedThematicLine(e.target.value)}
+                disabled={isLoadingThematicLines}
                 className="w-full h-10 pl-9 pr-8 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all appearance-none cursor-pointer"
               >
-                <option value="ALL">Todas las líneas temáticas</option>
-                {THEMATIC_LINES.map((line) => (
-                  <option key={line} value={line}>
-                    {line}
+                <option value="ALL">
+                  {isLoadingThematicLines
+                    ? 'Cargando líneas temáticas...'
+                    : 'Todas las líneas temáticas'}
+                </option>
+                {thematicLines.map((line) => (
+                  <option key={line.id} value={line.name}>
+                    {line.name}
                   </option>
                 ))}
               </select>
@@ -232,6 +265,24 @@ export const ArticleCatalogView: React.FC = () => {
                 ▼
               </div>
             </div>
+            {thematicLinesError && (
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-rose-600">
+                <span className="break-words">
+                  No se pudieron cargar las líneas temáticas: {thematicLinesError}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoadingThematicLines(true);
+                    setThematicLinesError(null);
+                    void loadThematicLines();
+                  }}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Select: Estado del Artículo */}
