@@ -204,7 +204,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     };
   }, [detailAttempt, isOpen, selectedArticleId]);
 
-  // Manejo de la tecla Escape y bloqueo de scroll en el body
+  // Manejo de la tecla Escape
   useEffect(() => {
     if (!isOpen) return;
 
@@ -216,14 +216,22 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, isDisableModalOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [isOpen, isDisableModalOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen || !article) {
     return null;
