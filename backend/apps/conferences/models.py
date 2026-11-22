@@ -187,7 +187,7 @@ class ArticleVersion(models.Model):
 
 
 class ArticleMetadataAudit(models.Model):
-    """Histórico de auditoría de modificaciones de metadatos de artículos."""
+    """Histórico de auditoría de cambios registrados en artículos."""
 
     article = models.ForeignKey(
         Article,

@@ -137,10 +137,9 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
     return null;
   }
 
-  // Visibilidad estricta por rol:
-  // Solo se muestra si el usuario tiene rol COMITE y el artículo está habilitado (is_enabled !== false).
-  // Oculto estrictamente para AUTOR y ADMIN.
-  const canDisable = role === 'COMITE' && article.is_enabled !== false;
+  // Solo COMITE y ADMIN pueden deshabilitar artículos activos.
+  const canDisable =
+    (role === 'COMITE' || role === 'ADMIN') && article.is_enabled !== false;
 
   const statusConfig = getStatusBadgeConfig(article.status);
   const StatusIcon = statusConfig.icon;
@@ -392,7 +391,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
         {/* Footer del Modal */}
         <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {/* Botón de deshabilitar con visibilidad estricta: Solo para rol COMITE y artículo activo */}
+            {/* Botón visible para COMITE y ADMIN cuando el artículo está activo */}
             {canDisable && (
               <button
                 type="button"
