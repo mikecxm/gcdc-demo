@@ -2,25 +2,11 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers, status
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.conferences.models import Article, ArticleStatus
-from apps.users.models import RoleName
-
-
-class IsCommitteeMember(BasePermission):
-    """Solo usuarios autenticados con rol COMITE."""
-
-    message = "Solo los miembros del comité pueden deshabilitar artículos."
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.has_role(RoleName.COMITE)
-        )
+from apps.conferences.models import Article, ArticleMetadataAudit, ArticleStatus
+from apps.users.permissions import IsAdminOrCommittee
 
 
 class DisableArticleSerializer(serializers.Serializer):
@@ -30,7 +16,7 @@ class DisableArticleSerializer(serializers.Serializer):
 class ArticleDisableView(APIView):
     """POST /api/v1/articles/{id}/disable/ : deshabilitación irreversible."""
 
-    permission_classes = [IsCommitteeMember]
+    permission_classes = [IsAdminOrCommittee]
 
     def post(self, request, pk):
         serializer = DisableArticleSerializer(data=request.data)
@@ -43,12 +29,41 @@ class ArticleDisableView(APIView):
                     {"detail": "El artículo ya está deshabilitado."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            old_values = {
+                "is_enabled": str(article.is_enabled),
+                "status": article.status,
+                "disabled_reason": article.disabled_reason,
+                "disabled_at": (
+                    article.disabled_at.isoformat() if article.disabled_at else None
+                ),
+            }
+            reason = serializer.validated_data["reason"]
+            disabled_at = timezone.now()
             article.is_enabled = False
             article.is_permanently_disabled = True
             article.status = ArticleStatus.DESHABILITADO
-            article.disabled_reason = serializer.validated_data["reason"]
-            article.disabled_at = timezone.now()
+            article.disabled_reason = reason
+            article.disabled_at = disabled_at
             article.save()
+            new_values = {
+                "is_enabled": str(article.is_enabled),
+                "status": article.status,
+                "disabled_reason": article.disabled_reason,
+                "disabled_at": disabled_at.isoformat(),
+                "disabled_by": request.user.email,
+            }
+            ArticleMetadataAudit.objects.bulk_create(
+                [
+                    ArticleMetadataAudit(
+                        article=article,
+                        field_name=field_name,
+                        old_value=old_values.get(field_name),
+                        new_value=new_value,
+                    )
+                    for field_name, new_value in new_values.items()
+                ]
+            )
 
         return Response(
             {
