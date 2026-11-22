@@ -1,3 +1,4 @@
+from io import BytesIO
 from datetime import timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -78,6 +79,10 @@ class ArticleVersionTests(TestCase):
     def test_author_replaces_pdf_and_keeps_history(self, storage):
         response = self.client.post(self.url, {"pdf": make_pdf()}, format="multipart")
         self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            set(response.data),
+            {"id", "version_number", "stage", "uploaded_at"},
+        )
         self.assertEqual(response.data["version_number"], 2)
         self.assertEqual(self.article.versions.count(), 2)
         storage.upload_pdf.assert_called_once()
@@ -160,8 +165,39 @@ class ArticleVersionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["version_number"], 1)
+        self.assertEqual(
+            set(response.data[0]),
+            {"id", "version_number", "stage", "uploaded_at"},
+        )
 
     def test_other_author_cannot_list_history(self):
         self.client.force_authenticate(user=self.other_author)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 403)
+
+    @patch("apps.articles.download_views.storage.open_pdf")
+    def test_author_can_download_a_specific_version(self, open_pdf):
+        ArticleVersion.objects.create(
+            article=self.article,
+            version_number=2,
+            stage=VersionStage.INICIAL,
+            pdf_url=f"articles/{self.article.pk}/v2.pdf",
+        )
+        open_pdf.return_value = BytesIO(b"%PDF-1.4 version 1")
+        response = self.client.get(
+            f"/api/v1/articles/{self.article.pk}/pdf/?version_number=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn(f"article-{self.article.pk}-v1.pdf", response["Content-Disposition"])
+        open_pdf.assert_called_once_with(f"articles/{self.article.pk}/v1.pdf")
+
+    @patch("apps.articles.download_views.storage.open_pdf")
+    def test_unknown_pdf_version_returns_404(self, open_pdf):
+        response = self.client.get(
+            f"/api/v1/articles/{self.article.pk}/pdf/?version_number=99"
+        )
+
+        self.assertEqual(response.status_code, 404)
+        open_pdf.assert_not_called()

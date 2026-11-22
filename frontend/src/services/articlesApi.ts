@@ -280,17 +280,16 @@ export const getThematicLines = async (
   return response.data;
 };
 
-export const replaceArticlePdf = async (articleId: number, pdf: File, token?: string) => {
-  const formData = new FormData();
-  formData.append('pdf', pdf);
+export const uploadArticleVersion = async (
+  articleId: number,
+  formData: FormData,
+  token?: string
+) => {
   return apiClient.post<ArticleVersion>(
     `/articles/${articleId}/versions/`,
     formData,
     {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     }
   );
 };
@@ -323,9 +322,15 @@ export const getArticleById = async (id: number, signal?: AbortSignal): Promise<
 };
 
 /** Descarga autenticada; nunca interpreta una ruta de almacenamiento como URL pública. */
-export const getArticlePdf = async (id: number, signal?: AbortSignal): Promise<Blob> => {
+export const getArticlePdf = async (
+  id: number,
+  signal?: AbortSignal,
+  versionNumber?: number
+): Promise<Blob> => {
   const { data } = await apiClient.get<Blob>(`/articles/${id}/pdf/`, {
-    responseType: 'blob', signal,
+    responseType: 'blob',
+    signal,
+    params: versionNumber === undefined ? undefined : { version_number: versionNumber },
   });
   if (data.type.split(';')[0] !== 'application/pdf' || await data.slice(0, 5).text() !== '%PDF-') {
     throw new Error('El servidor no devolvió un documento PDF válido.');

@@ -36,7 +36,7 @@ export interface Article {
   is_enabled: boolean;
   submitted_at: string;
   pdf_url: string;
-  submission_deadline?: string;
+  submission_deadline?: string | null;
   coauthors: CoAuthor[];
 }
 
