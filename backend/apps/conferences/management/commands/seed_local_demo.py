@@ -40,6 +40,12 @@ def demo_pdf():
 class Command(BaseCommand):
     help = 'Crea conferencia vigente, cuentas y artículos de demostración sin borrar datos.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--conference-only', action='store_true',
+            help='Prepara solo la conferencia y las líneas; no crea cuentas ni artículos.',
+        )
+
     def handle(self, *args, **options):
         db = settings.DATABASES['default']
         if db.get('HOST', '') not in ('', 'localhost', '127.0.0.1', '::1'):
@@ -50,15 +56,6 @@ class Command(BaseCommand):
         today = timezone.now().astimezone(ZoneInfo('America/Bogota')).date()
         password = secrets.token_urlsafe(16)
         with transaction.atomic():
-            for role, label in ((RoleName.AUTOR, 'Autor'), (RoleName.COMITE, 'Comité'), (RoleName.ADMIN, 'Administrador')):
-                email = f'{role.lower()}.demo@example.com'
-                if not CustomUser.objects.filter(email=email).exists():
-                    CustomUser.objects.create_user(
-                        email=email, password=password, roles=[role],
-                        full_name=f'{label} Demo Local', affiliation='Universidad del Valle',
-                    )
-                    self.stdout.write(f'Cuenta creada: {email} | Contraseña: {password}')
-
             conference, _ = Conference.objects.update_or_create(
                 edition_name='Symposia — pruebas locales',
                 defaults={
@@ -79,6 +76,23 @@ class Command(BaseCommand):
                 'Sistemas Inteligentes', 'Tecnologías en Informática', 'Educación en Informática',
                 'Sistemas de Software', 'Software en la práctica',
             )]
+            if options['conference_only']:
+                self.stdout.write(self.style.SUCCESS(
+                    f'Conferencia preparada: {conference.edition_name}; '
+                    f'postulaciones hasta {conference.submission_deadline}. '
+                    'No se crearon cuentas ni artículos.'
+                ))
+                return
+
+            for role, label in ((RoleName.AUTOR, 'Autor'), (RoleName.COMITE, 'Comité'), (RoleName.ADMIN, 'Administrador')):
+                email = f'{role.lower()}.demo@example.com'
+                if not CustomUser.objects.filter(email=email).exists():
+                    CustomUser.objects.create_user(
+                        email=email, password=password, roles=[role],
+                        full_name=f'{label} Demo Local', affiliation='Universidad del Valle',
+                    )
+                    self.stdout.write(f'Cuenta creada: {email} | Contraseña: {password}')
+
             authors = CustomUser.objects.filter(is_active=True, roles__name=RoleName.AUTOR).distinct()
             states = [ArticleStatus.POSTULADO, ArticleStatus.EN_REVISION, ArticleStatus.ACEPTADO,
                       ArticleStatus.AVAL_PRESENTACION, ArticleStatus.AVAL_PUBLICACION]
