@@ -312,17 +312,17 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		}`;
 
 	return (
-		<main className="relative isolate flex min-h-screen w-full flex-col overflow-hidden bg-[#f2f4f5] lg:h-screen lg:flex-row">
+		<main className="article-submission relative isolate flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#f2f4f5] lg:h-[100dvh] lg:flex-row">
 			<div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
 				<span className="absolute -left-72 top-[8%] h-[36rem] w-[36rem] rounded-full bg-blue-950" />
 				<span className="absolute left-[38%] top-[28%] h-72 w-72 rounded-full bg-indigo-200" />
 				<span className="absolute -right-48 bottom-[-9rem] h-[34rem] w-[34rem] rounded-full bg-slate-200" />
 			</div>
 
-			<section className="relative z-10 order-1 w-full min-w-0 px-4 py-4 lg:h-screen lg:min-h-0 lg:w-6/12 lg:overflow-hidden lg:px-8 lg:py-8">
-				<div className="relative mx-auto w-full max-w-3xl">
-					<div className="relative mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white/95 text-left lg:max-h-[calc(100vh-4rem)]">
-					<header className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 pb-5 pt-5 sm:px-8 sm:pb-5 sm:pt-8 lg:px-9 lg:pb-5 lg:pt-9">
+			<section className="article-submission-panel relative z-10 order-1 h-[100dvh] w-full min-w-0 p-3 sm:p-5 lg:min-h-0 lg:w-7/12 lg:p-6 2xl:w-6/12 2xl:p-8">
+				<div className="relative mx-auto h-full min-h-0 w-full max-w-3xl">
+					<div className="relative mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white/95 text-left">
+					<header className="article-submission-header relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 py-5 sm:px-7 sm:py-6">
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 							<div className="min-w-0">
 								<button
@@ -361,7 +361,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 						</div>
 					</header>
 
-					<div ref={formScrollRef} className="article-form-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-8 sm:pb-8 lg:px-9 lg:pb-9">
+					<div ref={formScrollRef} className="article-form-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-7 sm:pb-7">
 					<form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
 						<div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
 							<div className="min-w-0">
@@ -693,18 +693,18 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 				</div>
 			</section>
 
-			<aside className="relative z-10 order-2 flex min-h-[44vh] w-full min-w-0 flex-col items-center justify-center px-4 py-6 lg:w-6/12 lg:px-6 lg:py-8">
+			<aside className="article-submission-visual relative z-10 order-2 flex min-h-[44dvh] w-full min-w-0 flex-col items-center justify-center px-4 py-6 lg:min-h-0 lg:w-5/12 lg:px-6 lg:py-6 2xl:w-6/12">
 				<div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
 					<img
 						src={publishArticleAnimation}
 						alt=""
-						className="mb-2 w-64 max-w-full object-contain sm:w-80 lg:mb-4 lg:w-[90%] lg:max-w-2xl"
+						className="mb-2 max-h-[42dvh] w-64 max-w-full object-contain sm:w-80 lg:mb-4 lg:w-[90%] lg:max-w-2xl"
 					/>
 					<div className="visual-panel-copy min-w-0 max-w-2xl">
 						<p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
 							GCDC · Conferencia
 						</p>
-						<h2 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+						<h2 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-4xl 2xl:text-5xl">
 							Gestión Científica de Conferencia
 						</h2>
 						<p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-700 sm:text-base lg:text-lg">
@@ -716,7 +716,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 
 			{isSuccess && (
 				<div
-					className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4"
+					className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4"
 					onMouseDown={(event) => {
 						if (event.target === event.currentTarget) closeSuccessDialog();
 					}}
@@ -728,7 +728,7 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 						aria-labelledby="article-success-title"
 						aria-describedby="article-success-description"
 						onKeyDown={handleSuccessDialogKeyDown}
-						className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
+						className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
 					>
 						<div className="flex items-start gap-4">
 							<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">

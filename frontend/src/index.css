@@ -28,6 +28,35 @@ body {
   display: none;
 }
 
+@media (max-height: 700px) {
+  .article-submission-panel {
+    padding: 0.75rem;
+  }
+
+  .article-submission-header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .article-submission-header h1 {
+    font-size: 1.75rem;
+    line-height: 1.2;
+  }
+
+  .article-submission-header > div {
+    gap: 0.5rem;
+  }
+
+  .article-submission-header button {
+    margin-bottom: 0.25rem;
+  }
+
+  .article-submission-visual h2 {
+    font-size: 1.75rem;
+    line-height: 1.2;
+  }
+}
+
 .visual-panel-copy {
   text-shadow: 0 1px 1px rgb(255 255 255 / 0.8);
 }
