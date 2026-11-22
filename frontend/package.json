@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:users": "node --test tests/user-list.test.mjs",
+    "test:articles": "node --test tests/article-pdf.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",

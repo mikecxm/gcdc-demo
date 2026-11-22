@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserListView } from './components/users/UserListView';
 import { loadConfiguredUsers } from './services/usersApi';
 import { UserCreationForm } from './components/users/UserCreationForm';
+import { ArticleSubmissionForm } from './components/articles/ArticleSubmissionForm';
 import { ArticleCatalogView } from './views/ArticleCatalogView';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/SessionContext';
@@ -14,6 +15,7 @@ function App() {
   const navigate = useNavigate();
   const user = session ? { full_name: session.fullName } : null;
   const role = session?.activeRole;
+  const canManageUsers = session?.roles.some((userRole) => userRole === 'ADMIN' || userRole === 'COMITE');
 
   // Estados de navegación y vistas
   const [currentView, setCurrentView] = useState(() => {
@@ -38,6 +40,7 @@ function App() {
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
+  const [isSubmissionOpen, setIsSubmissionOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [lastCreatedUser, setLastCreatedUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,6 +65,7 @@ function App() {
   }, []);
 
   const navigateTo = (view, tab) => {
+    setIsSubmissionOpen(false);
     setCurrentView(view);
     setIsMobileMenuOpen(false);
     if (tab) {
@@ -93,6 +97,10 @@ function App() {
 
   if (currentView === 'workspace' && !session?.activeRole) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (currentView === 'workspace' && workspaceTab === 'articulos' && isSubmissionOpen && role === 'AUTOR') {
+    return <ArticleSubmissionForm onBackToMenu={() => navigateTo('workspace', 'articulos')} />;
   }
 
   return (
@@ -442,12 +450,17 @@ function App() {
 
             {/* Contenido dinámico según la pestaña activa */}
             <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
-              {workspaceTab === 'articulos' && <ArticleCatalogView />}
+              {workspaceTab === 'articulos' && (
+                  <>
+                    {role === 'AUTOR' && <div className="flex justify-end"><button type="button" onClick={() => setIsSubmissionOpen(true)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Postular artículo</button></div>}
+                    <ArticleCatalogView />
+                  </>
+              )}
 
               {workspaceTab === 'usuarios' && (
                 <>
-                  <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>
-                  <UserListView embedded loadUsers={loadConfiguredUsers} />
+                  {canManageUsers && <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>}
+                  <UserListView key={lastCreatedUser?.id ?? 'directory'} embedded loadUsers={loadConfiguredUsers} />
                 </>
               )}
             </main>

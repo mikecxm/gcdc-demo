@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import {
+	ArrowLeft,
 	Check,
 	CheckCircle2,
 	FileText,
@@ -13,27 +14,20 @@ import {
 	Upload,
 	X,
 } from 'lucide-react';
+import { apiClient } from '../../services/api';
+import { getThematicLines, getArticleApiErrorMessage, type ThematicLine } from '../../services/articlesApi';
 import publishArticleAnimation from '../../assets/publish-article-animate (1).svg';
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024;
 
-const TOPIC_LINES = [
-	'Sistemas Inteligentes',
-	'Tecnologías en Informática',
-	'Educación en Informática',
-	'Sistemas de Software',
-	'Software en la práctica',
-] as const;
-
 const articleSubmissionSchema = z.object({
-	title: z.string().min(5, 'El título debe tener al menos 5 caracteres.'),
+	title: z.string().trim().min(5, 'El título debe tener al menos 5 caracteres.').max(255, 'El título admite hasta 255 caracteres.'),
 	abstract: z.string().min(20, 'El resumen debe tener al menos 20 caracteres.'),
 	keywords: z
 		.string()
-		.min(3, 'Ingresa al menos 3 caracteres en las palabras clave.'),
-	topicLine: z.enum(TOPIC_LINES, {
-		error: 'Selecciona una línea temática.',
-	}),
+		.min(3, 'Ingresa al menos 3 caracteres en las palabras clave.')
+		.max(255, 'Las palabras clave admiten hasta 255 caracteres.'),
+	topicLine: z.string().min(1, 'Selecciona una línea temática.'),
 	coauthors: z.array(
 		z.object({
 			name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres.'),
@@ -49,7 +43,17 @@ type ArticleSubmissionValues = z.infer<typeof articleSubmissionSchema>;
 
 const formatFileSize = (size: number) => (size / (1024 * 1024)).toFixed(2);
 
-export const ArticleSubmissionForm = () => {
+export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => void }) => {
+	const [thematicLines, setThematicLines] = useState<ThematicLine[]>([]);
+	const [topicsError, setTopicsError] = useState<string | null>(null);
+	const [submissionError, setSubmissionError] = useState<string | null>(null);
+	useEffect(() => {
+		const controller = new AbortController();
+		getThematicLines(controller.signal).then(setThematicLines).catch((error: unknown) => {
+			if (!controller.signal.aborted) setTopicsError(getArticleApiErrorMessage(error));
+		});
+		return () => controller.abort();
+	}, []);
 	const [pdfFile, setPdfFile] = useState<File | null>(null);
 	const [pdfError, setPdfError] = useState<string | null>(null);
 	const [isDragging, setIsDragging] = useState(false);
@@ -68,6 +72,7 @@ export const ArticleSubmissionForm = () => {
 		control,
 		handleSubmit,
 		trigger,
+		reset,
 		formState: { errors, isSubmitting, touchedFields, dirtyFields },
 	} = useForm<ArticleSubmissionValues>({
 		resolver: zodResolver(articleSubmissionSchema),
@@ -76,6 +81,7 @@ export const ArticleSubmissionForm = () => {
 			title: '',
 			abstract: '',
 			keywords: '',
+			topicLine: '',
 			coauthors: [],
 		},
 	});
@@ -169,7 +175,17 @@ export const ArticleSubmissionForm = () => {
 		};
 	}, [isSuccess]);
 
-	const closeSuccessDialog = () => setIsSuccess(false);
+	const closeSuccessDialog = () => {
+		reset();
+		setPdfFile(null);
+		setPdfError(null);
+		setSubmissionError(null);
+		setConfirmedCoauthors(new Set());
+		setIsDragging(false);
+		setIsSuccess(false);
+		if (fileInputRef.current) fileInputRef.current.value = '';
+		formScrollRef.current?.scrollTo({ top: 0 });
+	};
 
 	const handleSuccessDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
 		if (event.key === 'Escape') {
@@ -262,6 +278,7 @@ export const ArticleSubmissionForm = () => {
 
 	const onSubmit = async (data: ArticleSubmissionValues) => {
 		setIsSuccess(false);
+		setSubmissionError(null);
 		if (hasUnconfirmedCoauthors) return;
 
 		if (!pdfFile) {
@@ -274,22 +291,15 @@ export const ArticleSubmissionForm = () => {
 		formData.append('abstract', data.abstract);
 		formData.append('keywords', data.keywords);
 		formData.append('thematic_line', data.topicLine);
-		formData.append('coauthors', JSON.stringify(data.coauthors));
+		formData.append('coauthors', JSON.stringify(data.coauthors.map(({ name, ...coauthor }) => ({ ...coauthor, full_name: name }))));
 		formData.append('pdf', pdfFile);
 
-		console.log('Postulación lista para POST /api/v1/articles/ (multipart/form-data).');
-		console.log('Campos de la solicitud:', {
-			title: data.title,
-			abstract: data.abstract,
-			keywords: data.keywords,
-			thematic_line: data.topicLine,
-			coauthors: data.coauthors,
-			pdf: pdfFile.name,
-			formData,
-		});
-
-		await new Promise((resolve) => window.setTimeout(resolve, 300));
-		setIsSuccess(true);
+		try {
+			await apiClient.post('/articles/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+			setIsSuccess(true);
+		} catch (error: unknown) {
+			setSubmissionError(getArticleApiErrorMessage(error));
+		}
 	};
 
 	const inputClassName = (hasError: boolean, isValid = false) =>
@@ -315,6 +325,15 @@ export const ArticleSubmissionForm = () => {
 					<header className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 pb-5 pt-5 sm:px-8 sm:pb-5 sm:pt-8 lg:px-9 lg:pb-5 lg:pt-9">
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 							<div className="min-w-0">
+								<button
+									type="button"
+									onClick={onBackToMenu}
+									disabled={isSubmitting || isSuccess}
+									className="mb-3 -ml-2 inline-flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+								>
+									<ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
+									Artículos y Postulaciones
+								</button>
 								<h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Postular artículo</h1>
 								<p className="mt-1 text-sm text-slate-500">
 									Completa los metadatos y adjunta la versión inicial en PDF.
@@ -432,11 +451,11 @@ export const ArticleSubmissionForm = () => {
 									aria-invalid={Boolean(errors.topicLine)}
 									aria-describedby={errors.topicLine ? 'article-topic-line-error' : undefined}
 									className={`${inputClassName(Boolean(errors.topicLine), isTopicLineValid)} ${isTopicLineValid ? 'pr-10' : ''}`}
-									defaultValue=""
+									defaultValue="" disabled={!thematicLines.length || isSubmitting}
 								>
 									<option value="" disabled>Selecciona una línea temática</option>
-									{TOPIC_LINES.map((topicLine) => (
-										<option key={topicLine} value={topicLine}>{topicLine}</option>
+									{thematicLines.map((topicLine) => (
+										<option key={topicLine.id} value={String(topicLine.id)}>{topicLine.name}</option>
 									))}
 								</select>
 									{isTopicLineValid && (
@@ -650,11 +669,13 @@ export const ArticleSubmissionForm = () => {
 							)}
 						</section>
 
+						{topicsError && <p role="alert" className="text-sm text-red-600">{topicsError}</p>}
+						{submissionError && <p role="alert" className="text-sm text-red-600">{submissionError}</p>}
 						<div className="flex justify-end border-t border-slate-200 pt-5">
 							<button
 								ref={submitButtonRef}
 								type="submit"
-								disabled={isSubmitting}
+								disabled={isSubmitting || isSuccess || !thematicLines.length || hasUnconfirmedCoauthors}
 										className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
 							>
 								{isSubmitting ? 'Procesando…' : 'Enviar artículo'}
@@ -716,7 +737,7 @@ export const ArticleSubmissionForm = () => {
 							<div className="min-w-0 flex-1">
 								<p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Postulación</p>
 								<h2 id="article-success-title" className="mt-1 text-xl font-semibold text-slate-900">
-									Artículo listo para postulación
+									Artículo postulado correctamente
 								</h2>
 							</div>
 							<button
@@ -730,15 +751,16 @@ export const ArticleSubmissionForm = () => {
 							</button>
 						</div>
 						<p id="article-success-description" className="mt-4 text-sm leading-relaxed text-slate-600">
-							El envío se simuló correctamente. La integración con el servidor se habilitará cuando esté disponible.
+							Tu artículo se guardó correctamente. Puedes subir otro artículo o volver al menú de Artículos y Postulaciones.
 						</p>
-						<div className="mt-6 flex justify-end">
+						<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+							<button type="button" onClick={onBackToMenu} className="min-h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Volver a Artículos</button>
 							<button
 								type="button"
 								onClick={closeSuccessDialog}
 								className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
 							>
-								Entendido
+								Subir otro artículo
 							</button>
 						</div>
 					</div>

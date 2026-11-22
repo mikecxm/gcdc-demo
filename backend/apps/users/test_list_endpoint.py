@@ -86,7 +86,11 @@ class UserListEndpointTests(TestCase):
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(self.url).status_code, 401)
         self.client.force_authenticate(self.author)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 1000)
+        self.assertIn(self.author.pk, [user['id'] for user in response.data['results']])
+        self.assertEqual(self.client.post(reverse('admin-user-create'), {}).status_code, 403)
         committee = CustomUser.objects.create_user(
             email="committee@example.com", full_name="Committee", roles=[RoleName.COMITE],
         )
@@ -99,8 +103,8 @@ class UserListEndpointTests(TestCase):
         for params in [{}, {"role": "AUTOR", "affiliation": "Univalle"}]:
             with self.subTest(params=params):
                 started = perf_counter()
-                # ADMIN permission, count, paginated users, prefetched roles.
-                with self.assertNumQueries(4):
+                # Count, paginated users, prefetched roles.
+                with self.assertNumQueries(3):
                     response = self.client.get(self.url, params)
                 elapsed = perf_counter() - started
                 self.assertEqual(response.status_code, 200)
