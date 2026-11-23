@@ -6,12 +6,16 @@ import {
   ClipboardCheck,
   Users,
 } from 'lucide-react';
+<<<<<<< HEAD
 import {
   getArticles,
   MOCK_COMMITTEE_MEMBERS,
   assignReviewers,
   getCommitteeMembers,
 } from '../../services/articlesApi';
+=======
+import { getArticles, MOCK_COMMITTEE_MEMBERS } from '../../services/articlesApi';
+>>>>>>> c4eba67dae7dfa8dbfa02fcd10e087eca0204beb
 import type { Article, CommitteeMember } from '../../types/article';
 import { useAuth } from '../../context';
 
@@ -60,10 +64,13 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+<<<<<<< HEAD
   const [committeeMembersList, setCommitteeMembersList] = useState<CommitteeMember[]>(() =>
     MOCK_COMMITTEE_MEMBERS.filter((member) => member.roles.includes('COMITE'))
   );
 
+=======
+>>>>>>> c4eba67dae7dfa8dbfa02fcd10e087eca0204beb
   useEffect(() => {
     let isCurrent = true;
     getArticles()
@@ -88,6 +95,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
         if (isCurrent) setIsLoadingArticles(false);
       });
 
+<<<<<<< HEAD
     getCommitteeMembers()
       .then((members) => {
         if (!isCurrent) return;
@@ -97,6 +105,8 @@ export const ReviewerAssignmentPanel: React.FC = () => {
       })
       .catch(() => {});
 
+=======
+>>>>>>> c4eba67dae7dfa8dbfa02fcd10e087eca0204beb
     return () => {
       isCurrent = false;
     };
@@ -105,7 +115,14 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) ?? null;
 
+<<<<<<< HEAD
   const committeeMembers = committeeMembersList;
+=======
+  const committeeMembers = useMemo(
+    () => MOCK_COMMITTEE_MEMBERS.filter((member) => member.roles.includes('COMITE')),
+    []
+  );
+>>>>>>> c4eba67dae7dfa8dbfa02fcd10e087eca0204beb
 
   const conflictedMembers = useMemo(
     () =>
@@ -165,6 +182,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
     setSaveMessage(null);
   };
 
+<<<<<<< HEAD
   const handleSaveAssignment = async () => {
     if (!selectedArticle || selectedReviewerIds.length !== 3 || isSaving) return;
 
@@ -231,6 +249,37 @@ export const ReviewerAssignmentPanel: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+=======
+  const handleSaveAssignment = () => {
+    if (!selectedArticle || selectedReviewerIds.length !== 3 || isSaving) return;
+
+    setIsSaving(true);
+    const previousIds = assignments[selectedArticle.id] ?? [];
+    const nextIds = [...selectedReviewerIds];
+
+    setAssignments((current) => ({
+      ...current,
+      [selectedArticle.id]: nextIds,
+    }));
+    setWorkloadAdjustments((current) => {
+      const next = { ...current };
+      previousIds
+        .filter((id) => !nextIds.includes(id))
+        .forEach((id) => {
+          next[id] = (next[id] ?? 0) - 1;
+        });
+      nextIds
+        .filter((id) => !previousIds.includes(id))
+        .forEach((id) => {
+          next[id] = (next[id] ?? 0) + 1;
+        });
+      return next;
+    });
+    setSaveMessage(
+      'Asignación guardada en esta sesión de demostración. El backend de esta rama aún no expone el endpoint de asignación.'
+    );
+    setIsSaving(false);
+>>>>>>> c4eba67dae7dfa8dbfa02fcd10e087eca0204beb
   };
 
   return (
