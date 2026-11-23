@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-let vite, logic, mocks, service, apiClient, UserListView;
+let vite, logic, mocks, service, apiClient, UserListView, UserDeactivateModal;
 const filters = { search: 'Universidad del Valle', role: 'COMITE', status: 'ALL', sort: 'NAME' };
 
 before(async () => {
@@ -16,6 +16,7 @@ before(async () => {
   service = await vite.ssrLoadModule('/src/services/usersApi.ts');
   ({ apiClient } = await vite.ssrLoadModule('/src/services/api.ts'));
   ({ UserListView } = await vite.ssrLoadModule('/src/components/users/UserListView.tsx'));
+  ({ UserDeactivateModal } = await vite.ssrLoadModule('/src/components/users/UserDeactivateModal.tsx'));
 });
 after(async () => { await vite?.close(); delete globalThis.window; delete globalThis.localStorage; });
 
@@ -109,3 +110,56 @@ test('local filtering remains below 400ms with 10,000 records (not a browser/API
   t.diagnostic(`Filtering and pagination: ${elapsed.toFixed(2)} ms`);
   assert.ok(elapsed < 400);
 });
+
+test('deactivateUser service invokes DELETE /users/{id}/', async () => {
+  let calledMethod = null;
+  let calledUrl = null;
+  apiClient.defaults.adapter = async (config) => {
+    calledMethod = config.method;
+    calledUrl = config.url;
+    return { data: null, status: 204, statusText: 'No Content', headers: {}, config };
+  };
+
+  await service.deactivateUser(101);
+  assert.equal(calledMethod, 'delete');
+  assert.match(calledUrl, /\/users\/101\/?$/);
+});
+
+test('UserDeactivateModal renders accessible dialog, user details and double verification elements', () => {
+  const targetUser = mocks.MOCK_USERS[0];
+  const html = renderToStaticMarkup(createElement(UserDeactivateModal, {
+    user: targetUser,
+    isOpen: true,
+    onClose: () => {},
+    onSuccess: () => {},
+  }));
+
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /aria-modal="true"/);
+  assert.match(html, /id="deactivate-user-modal-title"/);
+  assert.match(html, /Desactivar cuenta de usuario/);
+  assert.match(html, new RegExp(targetUser.full_name));
+  assert.match(html, new RegExp(targetUser.email));
+  assert.match(html, /Consecuencias de la baja l[oó]gica/);
+  assert.match(html, /Entiendo que esta cuenta perder[aá] el acceso al sistema de inmediato/);
+  assert.match(html, /Confirmar baja/);
+});
+
+test('UserDeactivateModal returns null when closed or without user', () => {
+  const closedHtml = renderToStaticMarkup(createElement(UserDeactivateModal, {
+    user: mocks.MOCK_USERS[0],
+    isOpen: false,
+    onClose: () => {},
+    onSuccess: () => {},
+  }));
+  assert.equal(closedHtml, '');
+
+  const noUserHtml = renderToStaticMarkup(createElement(UserDeactivateModal, {
+    user: null,
+    isOpen: true,
+    onClose: () => {},
+    onSuccess: () => {},
+  }));
+  assert.equal(noUserHtml, '');
+});
+
