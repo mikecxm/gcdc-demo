@@ -8,8 +8,14 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from .filters import UserFilter
 from .models import CustomUser, RoleName
 from .pagination import UserPagination
-from .permissions import IsAdminOrCommittee
-from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer, UserListSerializer
+from .permissions import IsAdminOrCommittee, IsOwnerOrAdminOrCommittee
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    UserCreateSerializer,
+    UserListSerializer,
+    UserPublicSerializer,
+    UserUpdateSerializer,
+)
 from .services.recaptcha import validate_recaptcha
 from .services.login_audit import is_locked_out, record_attempt
 import re
@@ -73,6 +79,22 @@ class AdminUserCreateView(generics.CreateAPIView):
     serializer_class = UserCreateSerializer
     permission_classes = [IsAuthenticated, IsAdminOrCommittee]
 
+
+class UserDetailView(generics.RetrieveUpdateAPIView):
+    """
+    Endpoint para consulta (GET) y actualización parcial (PATCH) del perfil de usuario (HU-05, GCDC-133).
+    Restringido al propietario del perfil, ADMIN o COMITE.
+    """
+
+    http_method_names = ["get", "patch", "head", "options"]
+    queryset = CustomUser.active_objects.all().prefetch_related("roles")
+    permission_classes = [IsOwnerOrAdminOrCommittee]
+
+    def get_serializer_class(self):
+        if self.request.method == "GET":
+            return UserPublicSerializer
+        return UserUpdateSerializer
+
 class LoginView(TokenObtainPairView):
     """
     POST /api/v1/auth/login/
@@ -112,7 +134,7 @@ class LoginView(TokenObtainPairView):
         return response
 
 
-        class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 

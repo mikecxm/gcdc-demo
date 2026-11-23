@@ -292,3 +292,128 @@ class LoginCaptchaTests(TestCase):
             format="json",
         )
         self.assertEqual(r.status_code, 401)
+
+
+class UserUpdateEndpointTests(APITestCase):
+    """Pruebas unitarias para GCDC-133: Actualización de datos de usuario (HU-05)."""
+
+    def setUp(self):
+        for role_name in RoleName.values:
+            Role.objects.get_or_create(name=role_name)
+
+        self.author_1 = User.objects.create_user(
+            email="autor1.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Uno",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.author_2 = User.objects.create_user(
+            email="autor2.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Dos",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.admin = User.objects.create_user(
+            email="admin.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Admin Update",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.ADMIN],
+        )
+
+        self.committee = User.objects.create_user(
+            email="comite.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Comite Update",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.COMITE],
+        )
+
+    def test_unauthenticated_user_returns_401(self):
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.patch(url, {"full_name": "Nuevo Nombre"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_author_updates_own_profile_success(self):
+        import time
+
+        initial_updated_at = self.author_1.updated_at
+        time.sleep(0.01)
+
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {
+            "full_name": "Autor Uno Modificado",
+            "affiliation": "Facultad de Ingeniería — Univalle",
+            "bio": "Investigador en Sistemas Distribuidos y Criptografía.",
+        }
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["full_name"], "Autor Uno Modificado")
+        self.assertEqual(response.data["affiliation"], "Facultad de Ingeniería — Univalle")
+        self.assertEqual(response.data["bio"], payload["bio"])
+        self.assertIn("updated_at", response.data)
+
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.full_name, "Autor Uno Modificado")
+        self.assertEqual(self.author_1.affiliation, "Facultad de Ingeniería — Univalle")
+        self.assertEqual(self.author_1.bio, payload["bio"])
+        self.assertGreater(self.author_1.updated_at, initial_updated_at)
+
+    def test_author_cannot_update_another_author_profile_returns_403(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_2.id})
+        response = self.client.patch(url, {"full_name": "Hack Nombre"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_update_another_user_profile(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"full_name": "Nombre Corregido por Admin"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.full_name, "Nombre Corregido por Admin")
+
+    def test_committee_can_update_author_profile(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"affiliation": "Instituto de Investigación"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.affiliation, "Instituto de Investigación")
+
+    def test_author_cannot_self_assign_admin_role(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"role": RoleName.ADMIN}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", response.data)
+        self.author_1.refresh_from_db()
+        self.assertFalse(self.author_1.has_role(RoleName.ADMIN))
+        self.assertTrue(self.author_1.has_role(RoleName.AUTOR))
+
+    def test_email_cannot_be_changed_via_patch(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        original_email = self.author_1.email
+        payload = {"email": "hacked@univalle.edu.co", "full_name": "Nombre Válido"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.email, original_email)
+
+    def test_get_user_detail_returns_public_serializer(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], self.author_1.email)
+        self.assertNotIn("password", response.data)
+        self.assertIn("roles", response.data)

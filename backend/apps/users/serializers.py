@@ -40,6 +40,76 @@ class UserPublicSerializer(serializers.ModelSerializer):
         return list(obj.roles.values_list("name", flat=True))
 
 
+class UserUpdateSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(required=False)
+    affiliation = serializers.CharField(required=False, allow_blank=True)
+    bio = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    role = serializers.ChoiceField(
+        choices=RoleName.choices,
+        required=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ["full_name", "affiliation", "bio", "role"]
+
+    def validate_full_name(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("El nombre completo no puede estar vacío.")
+        return cleaned
+
+    def validate_affiliation(self, value):
+        return value.strip() if value else ""
+
+    def validate_bio(self, value):
+        if value is not None:
+            return value.strip()
+        return value
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        has_role_attempt = "role" in self.initial_data or "roles" in self.initial_data
+        if has_role_attempt:
+            is_self = bool(
+                self.instance
+                and request
+                and request.user
+                and self.instance.id == request.user.id
+            )
+            is_privileged = bool(
+                request
+                and request.user
+                and (
+                    request.user.has_role(RoleName.ADMIN)
+                    or request.user.has_role(RoleName.COMITE)
+                )
+            )
+            if is_self or not is_privileged:
+                raise serializers.ValidationError(
+                    {"role": "No tienes permiso para modificar roles o auto-asignarte un rol."}
+                )
+        return attrs
+
+    def update(self, instance, validated_data):
+        new_role = validated_data.pop("role", None)
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+
+        with transaction.atomic():
+            instance.save()
+            if new_role:
+                role_obj, _ = Role.objects.get_or_create(name=new_role)
+                UserRole.objects.filter(user=instance).delete()
+                UserRole.objects.create(user=instance, role=role_obj)
+
+        return instance
+
+    def to_representation(self, instance):
+        return UserPublicSerializer(instance, context=self.context).data
+
+
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
