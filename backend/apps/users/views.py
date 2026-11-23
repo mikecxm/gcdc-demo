@@ -112,7 +112,7 @@ class LoginView(TokenObtainPairView):
         return response
 
 
-        class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
