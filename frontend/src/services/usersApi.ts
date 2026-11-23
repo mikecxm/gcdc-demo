@@ -43,3 +43,8 @@ export function createUserListLoader(endpoint: string): UserListLoader {
 }
 
 export const loadConfiguredUsers = createUserListLoader(import.meta.env.VITE_USERS_LIST_PATH?.trim() || 'users/');
+
+export async function deactivateUser(userId: number): Promise<void> {
+  await apiClient.delete(`/users/${userId}/`);
+}
+
