@@ -311,3 +311,70 @@ export const getArticles = async (): Promise<FetchArticlesResponse> => {
     };
   }
 };
+
+export interface AssignReviewersPayload {
+  article_id: number;
+  reviewer_ids: number[];
+}
+
+export interface AssignReviewersResponse {
+  article_id: number;
+  article_title: string;
+  article_status: string;
+  message: string;
+  assignments: Array<{
+    id: number;
+    reviewer_id: number;
+    reviewer_email: string;
+    reviewer_name: string;
+    assigned_at: string;
+  }>;
+}
+
+/**
+ * Realiza la asignación de 3 jurados al artículo en el backend (HU-12 / GCDC-161).
+ * Endpoint: POST /api/v1/reviews/assign-reviewers/
+ */
+export const assignReviewers = async (
+  payload: AssignReviewersPayload
+): Promise<AssignReviewersResponse> => {
+  const response = await apiClient.post<AssignReviewersResponse>(
+    '/reviews/assign-reviewers/',
+    payload
+  );
+  return response.data;
+};
+
+/**
+ * Consulta la lista de miembros del comité científico activos desde el backend (HU-12 / GCDC-161).
+ */
+export const getCommitteeMembers = async (): Promise<CommitteeMember[]> => {
+  try {
+    const response = await apiClient.get<CommitteeMember[]>('/reviews/committee-members/');
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data;
+    }
+    return MOCK_COMMITTEE_MEMBERS.filter((m) => m.roles.includes('COMITE'));
+  } catch {
+    return MOCK_COMMITTEE_MEMBERS.filter((m) => m.roles.includes('COMITE'));
+  }
+};
+
+/**
+ * Consulta las sugerencias balanceadas de jurados para un artículo (HU-12 / GCDC-161).
+ */
+export const getReviewerSuggestions = async (
+  articleId: number
+): Promise<CommitteeMember[]> => {
+  try {
+    const response = await apiClient.get<CommitteeMember[]>(
+      `/reviews/suggest-reviewers/?article_id=${articleId}`
+    );
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data;
+    }
+    return [];
+  } catch {
+    return [];
+  }
+};

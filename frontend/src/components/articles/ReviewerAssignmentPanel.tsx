@@ -6,7 +6,12 @@ import {
   ClipboardCheck,
   Users,
 } from 'lucide-react';
-import { getArticles, MOCK_COMMITTEE_MEMBERS } from '../../services/articlesApi';
+import {
+  getArticles,
+  MOCK_COMMITTEE_MEMBERS,
+  assignReviewers,
+  getCommitteeMembers,
+} from '../../services/articlesApi';
 import type { Article, CommitteeMember } from '../../types/article';
 import { useAuth } from '../../context';
 
@@ -55,6 +60,10 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  const [committeeMembersList, setCommitteeMembersList] = useState<CommitteeMember[]>(() =>
+    MOCK_COMMITTEE_MEMBERS.filter((member) => member.roles.includes('COMITE'))
+  );
+
   useEffect(() => {
     let isCurrent = true;
     getArticles()
@@ -79,6 +88,15 @@ export const ReviewerAssignmentPanel: React.FC = () => {
         if (isCurrent) setIsLoadingArticles(false);
       });
 
+    getCommitteeMembers()
+      .then((members) => {
+        if (!isCurrent) return;
+        if (members && members.length > 0) {
+          setCommitteeMembersList(members.filter((m) => m.roles.includes('COMITE')));
+        }
+      })
+      .catch(() => {});
+
     return () => {
       isCurrent = false;
     };
@@ -87,10 +105,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) ?? null;
 
-  const committeeMembers = useMemo(
-    () => MOCK_COMMITTEE_MEMBERS.filter((member) => member.roles.includes('COMITE')),
-    []
-  );
+  const committeeMembers = committeeMembersList;
 
   const conflictedMembers = useMemo(
     () =>
@@ -150,35 +165,72 @@ export const ReviewerAssignmentPanel: React.FC = () => {
     setSaveMessage(null);
   };
 
-  const handleSaveAssignment = () => {
+  const handleSaveAssignment = async () => {
     if (!selectedArticle || selectedReviewerIds.length !== 3 || isSaving) return;
 
     setIsSaving(true);
+    setSaveMessage(null);
     const previousIds = assignments[selectedArticle.id] ?? [];
     const nextIds = [...selectedReviewerIds];
 
-    setAssignments((current) => ({
-      ...current,
-      [selectedArticle.id]: nextIds,
-    }));
-    setWorkloadAdjustments((current) => {
-      const next = { ...current };
-      previousIds
-        .filter((id) => !nextIds.includes(id))
-        .forEach((id) => {
-          next[id] = (next[id] ?? 0) - 1;
-        });
-      nextIds
-        .filter((id) => !previousIds.includes(id))
-        .forEach((id) => {
-          next[id] = (next[id] ?? 0) + 1;
-        });
-      return next;
-    });
-    setSaveMessage(
-      'Asignación guardada en esta sesión de demostración. El backend de esta rama aún no expone el endpoint de asignación.'
-    );
-    setIsSaving(false);
+    try {
+      const result = await assignReviewers({
+        article_id: selectedArticle.id,
+        reviewer_ids: nextIds,
+      });
+
+      setAssignments((current) => ({
+        ...current,
+        [selectedArticle.id]: nextIds,
+      }));
+      setWorkloadAdjustments((current) => {
+        const next = { ...current };
+        previousIds
+          .filter((id) => !nextIds.includes(id))
+          .forEach((id) => {
+            next[id] = (next[id] ?? 0) - 1;
+          });
+        nextIds
+          .filter((id) => !previousIds.includes(id))
+          .forEach((id) => {
+            next[id] = (next[id] ?? 0) + 1;
+          });
+        return next;
+      });
+
+      // Actualizar el estado del artículo en la interfaz a EN_REVISION
+      setArticles((current) =>
+        current.map((art) =>
+          art.id === selectedArticle.id
+            ? { ...art, status: 'EN_REVISION' as const }
+            : art
+        )
+      );
+
+      setSaveMessage(
+        result.message ||
+          'Los 3 jurados fueron asignados con éxito y el artículo cambió al estado EN_REVISION.'
+      );
+    } catch (error: any) {
+      console.warn('Respuesta al conectar con el endpoint de asignación:', error);
+      const errorMsg =
+        error.response?.data?.detail ||
+        error.message ||
+        'Error al realizar la asignación en el servidor.';
+
+      if (typeof errorMsg === 'string' && errorMsg.includes('Conflicto')) {
+        setSaveMessage(`Alerta de conflicto: ${errorMsg}`);
+      } else {
+        // Fallback local en caso de desconexión
+        setAssignments((current) => ({
+          ...current,
+          [selectedArticle.id]: nextIds,
+        }));
+        setSaveMessage(`Asignación guardada localmente: ${errorMsg}`);
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

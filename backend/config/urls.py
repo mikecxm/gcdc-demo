@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/v1/conferences/', include('apps.conferences.urls')),
     path('api/v1/articles/', include('apps.articles.urls')),
     path('api/v1/reviews/', include('apps.reviews.urls')),
+    path('api/reviews/', include('apps.reviews.urls')),
 ]
