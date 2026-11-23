@@ -12,6 +12,19 @@ from .permissions import IsAdminOrCommittee
 from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer, UserListSerializer
 from .services.recaptcha import validate_recaptcha
 from .services.login_audit import is_locked_out, record_attempt
+import re
+
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from rest_framework.views import APIView
+
+from .services.password_recovery import (
+    InvalidResetPin,
+    PasswordResetEmailError,
+    request_password_reset_pin,
+    reset_user_password,
+    validate_new_password,
+)
 
 
 class UserListView(generics.ListAPIView):
@@ -97,3 +110,86 @@ class LoginView(TokenObtainPairView):
 
         record_attempt(email, remote_ip, True)
         return response
+
+
+        class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = str(request.data.get("email", "")).strip().lower()
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response(
+                {"detail": "Ingresa un correo electrónico válido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            request_password_reset_pin(email)
+        except PasswordResetEmailError:
+            return Response(
+                {"detail": "No fue posible enviar el correo. Inténtalo nuevamente."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        return Response(
+            {
+                "detail": (
+                    "Si existe una cuenta asociada a ese correo, "
+                    "recibirás un PIN de recuperación."
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = str(request.data.get("email", "")).strip().lower()
+        pin = str(request.data.get("pin", "")).strip()
+        new_password = str(request.data.get("new_password", ""))
+
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response(
+                {"detail": "Correo electrónico inválido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not re.fullmatch(r"\d{6}", pin):
+            return Response(
+                {"detail": "El PIN debe contener 6 dígitos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_new_password(new_password)
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            reset_user_password(email, pin, new_password)
+        except InvalidResetPin:
+            return Response(
+                {
+                    "detail": (
+                        "PIN inválido, expirado o sin intentos disponibles."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {"detail": "La contraseña fue restablecida correctamente."},
+            status=status.HTTP_200_OK,
+        )

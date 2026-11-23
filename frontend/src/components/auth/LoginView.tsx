@@ -2,9 +2,14 @@ import { useRef, useState, type FormEvent } from "react";
 import axios from "axios";
 import ReCAPTCHA from "react-google-recaptcha";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { login } from "../../services/auth";
+import {
+  login,
+  requestPasswordResetPin,
+  confirmPasswordReset,
+} from "../../services/auth";
 import { useAuth, type Role } from "../../context/SessionContext";
 import RoleSelectorModal from "./RoleSelectorModal";
+import { PasswordRecoveryWizard } from "../users/PasswordRecoveryWizard";
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
@@ -14,12 +19,17 @@ const LIBRARY_BG_URL =
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const data: unknown = err.response?.data;
+
     if (typeof data === "object" && data !== null) {
       const payload = data as Record<string, unknown>;
       const detail = payload.detail ?? payload.non_field_errors;
+
       if (typeof detail === "string") return detail;
+
       if (Array.isArray(detail)) {
-        const messages = detail.filter((item): item is string => typeof item === "string");
+        const messages = detail.filter(
+          (item): item is string => typeof item === "string"
+        );
         if (messages.length) return messages.join(", ");
       }
     }
@@ -30,6 +40,7 @@ function getErrorMessage(err: unknown): string {
     if (status === 429) return "Demasiados intentos. Espera unos minutos.";
     if (!err.response) return "No se pudo conectar con el servidor.";
   }
+
   return "Ocurrió un error. Inténtalo de nuevo.";
 }
 
@@ -47,8 +58,21 @@ export default function LoginView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Role[] | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
+
+if (showRecovery) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <PasswordRecoveryWizard
+        onRequestPin={requestPasswordResetPin}
+        onResetPassword={confirmPasswordReset}
+        onBack={() => setShowRecovery(false)}
+      />
+    </main>
+  );
+}
 
   const resetCaptcha = () => {
     recaptchaRef.current?.reset();
@@ -61,6 +85,7 @@ export default function LoginView() {
 
     setLoading(true);
     setError(null);
+
     try {
       const data = await login(email.trim(), password, captchaToken);
       const responseRoles = Array.isArray(data.roles) ? data.roles : [];
@@ -231,22 +256,49 @@ export default function LoginView() {
               </div>
             </div>
 
-            {/* Alerta de Error Global */}
-            {error && (
-              <div
-                role="alert"
-                className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200"
-              >
-                <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
+        {SITE_KEY ? (
+          <ReCAPTCHA
+            ref={recaptchaRef}
+            sitekey={SITE_KEY}
+            onChange={(token) => setCaptchaToken(token)}
+            onExpired={() => setCaptchaToken(null)}
+            onErrored={() => setCaptchaToken(null)}
+          />
+        ) : (
+          <p className="text-sm text-red-600">
+            Falta VITE_RECAPTCHA_SITE_KEY en el archivo .env del front-end.
+          </p>
+        )}
+
+        {error && (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={!captchaToken || !email || !password || loading}
+          className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Ingresando..." : "Ingresar"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowRecovery(true)}
+          className="w-full text-sm text-blue-600 hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </button>
+
+        <p className="text-center text-sm text-gray-600">
+          ¿Aún no tienes cuenta?{" "}
+          <Link to="/#registro" className="font-medium text-blue-600 hover:underline">
+            Regístrate como autor
+          </Link>
+        </p>
+      </form>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Correo Electrónico Institucional */}
