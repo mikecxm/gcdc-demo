@@ -1,22 +1,28 @@
 from rest_framework import generics, status
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .filters import UserFilter
 from .models import CustomUser, RoleName
 from .pagination import UserPagination
-from .permissions import IsAdminOrCommittee
-from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer, UserListSerializer
+from .permissions import IsAdminOrCommittee, IsOwnerOrAdminOrCommittee
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    UserCreateSerializer,
+    UserListSerializer,
+    UserPublicSerializer,
+    UserUpdateSerializer,
+)
 from .services.recaptcha import validate_recaptcha
 from .services.login_audit import is_locked_out, record_attempt
 import re
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
-from rest_framework.views import APIView
 
 from .services.password_recovery import (
     InvalidResetPin,
@@ -73,6 +79,33 @@ class AdminUserCreateView(generics.CreateAPIView):
     serializer_class = UserCreateSerializer
     permission_classes = [IsAuthenticated, IsAdminOrCommittee]
 
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Endpoint para consulta (GET), actualización parcial (PATCH) y baja lógica (DELETE)
+    del perfil de usuario (HU-05 GCDC-133, HU-06 GCDC-137).
+    Restringido al propietario del perfil, ADMIN o COMITE para lectura/edición,
+    y estrictamente a ADMIN o COMITE para baja lógica.
+    """
+
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+    queryset = CustomUser.active_objects.all().prefetch_related("roles")
+
+    def get_permissions(self):
+        if self.request.method == "DELETE":
+            return [IsAdminOrCommittee()]
+        return [IsOwnerOrAdminOrCommittee()]
+
+    def get_serializer_class(self):
+        if self.request.method == "GET":
+            return UserPublicSerializer
+        return UserUpdateSerializer
+
+    def perform_destroy(self, instance):
+        if instance.id == self.request.user.id:
+            raise ValidationError({"detail": "No puedes desactivar tu propia cuenta."})
+        instance.soft_delete()
+
 class LoginView(TokenObtainPairView):
     """
     POST /api/v1/auth/login/
@@ -121,7 +154,7 @@ class PasswordResetRequestView(APIView):
 
         try:
             validate_email(email)
-        except ValidationError:
+        except DjangoValidationError:
             return Response(
                 {"detail": "Ingresa un correo electrónico válido."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -157,7 +190,7 @@ class PasswordResetConfirmView(APIView):
 
         try:
             validate_email(email)
-        except ValidationError:
+        except DjangoValidationError:
             return Response(
                 {"detail": "Correo electrónico inválido."},
                 status=status.HTTP_400_BAD_REQUEST,

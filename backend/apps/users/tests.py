@@ -292,3 +292,253 @@ class LoginCaptchaTests(TestCase):
             format="json",
         )
         self.assertEqual(r.status_code, 401)
+
+
+class UserUpdateEndpointTests(APITestCase):
+    """Pruebas unitarias para GCDC-133: Actualización de datos de usuario (HU-05)."""
+
+    def setUp(self):
+        for role_name in RoleName.values:
+            Role.objects.get_or_create(name=role_name)
+
+        self.author_1 = User.objects.create_user(
+            email="autor1.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Uno",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.author_2 = User.objects.create_user(
+            email="autor2.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Dos",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.admin = User.objects.create_user(
+            email="admin.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Admin Update",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.ADMIN],
+        )
+
+        self.committee = User.objects.create_user(
+            email="comite.update@univalle.edu.co",
+            password="Password123!",
+            full_name="Comite Update",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.COMITE],
+        )
+
+    def test_unauthenticated_user_returns_401(self):
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.patch(url, {"full_name": "Nuevo Nombre"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_author_updates_own_profile_success(self):
+        import time
+
+        initial_updated_at = self.author_1.updated_at
+        time.sleep(0.01)
+
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {
+            "full_name": "Autor Uno Modificado",
+            "affiliation": "Facultad de Ingeniería — Univalle",
+            "bio": "Investigador en Sistemas Distribuidos y Criptografía.",
+        }
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["full_name"], "Autor Uno Modificado")
+        self.assertEqual(response.data["affiliation"], "Facultad de Ingeniería — Univalle")
+        self.assertEqual(response.data["bio"], payload["bio"])
+        self.assertIn("updated_at", response.data)
+
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.full_name, "Autor Uno Modificado")
+        self.assertEqual(self.author_1.affiliation, "Facultad de Ingeniería — Univalle")
+        self.assertEqual(self.author_1.bio, payload["bio"])
+        self.assertGreater(self.author_1.updated_at, initial_updated_at)
+
+    def test_author_cannot_update_another_author_profile_returns_403(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_2.id})
+        response = self.client.patch(url, {"full_name": "Hack Nombre"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_update_another_user_profile(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"full_name": "Nombre Corregido por Admin"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.full_name, "Nombre Corregido por Admin")
+
+    def test_committee_can_update_author_profile(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"affiliation": "Instituto de Investigación"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.affiliation, "Instituto de Investigación")
+
+    def test_author_cannot_self_assign_admin_role(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        payload = {"role": RoleName.ADMIN}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("role", response.data)
+        self.author_1.refresh_from_db()
+        self.assertFalse(self.author_1.has_role(RoleName.ADMIN))
+        self.assertTrue(self.author_1.has_role(RoleName.AUTOR))
+
+    def test_email_cannot_be_changed_via_patch(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        original_email = self.author_1.email
+        payload = {"email": "hacked@univalle.edu.co", "full_name": "Nombre Válido"}
+        response = self.client.patch(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.author_1.refresh_from_db()
+        self.assertEqual(self.author_1.email, original_email)
+
+    def test_get_user_detail_returns_public_serializer(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], self.author_1.email)
+        self.assertNotIn("password", response.data)
+        self.assertIn("roles", response.data)
+
+
+class UserSoftDeleteEndpointTests(APITestCase):
+    """Pruebas unitarias para GCDC-137: Baja lógica de usuario (HU-06)."""
+
+    def setUp(self):
+        for role_name in RoleName.values:
+            Role.objects.get_or_create(name=role_name)
+
+        self.author_1 = User.objects.create_user(
+            email="autor1.softdelete@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor SoftDelete Uno",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.author_2 = User.objects.create_user(
+            email="autor2.softdelete@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor SoftDelete Dos",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR],
+        )
+
+        self.admin = User.objects.create_user(
+            email="admin.softdelete@univalle.edu.co",
+            password="Password123!",
+            full_name="Admin SoftDelete",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.ADMIN],
+        )
+
+        self.committee = User.objects.create_user(
+            email="comite.softdelete@univalle.edu.co",
+            password="Password123!",
+            full_name="Comite SoftDelete",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.COMITE],
+        )
+
+    def test_unauthenticated_user_delete_returns_401(self):
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_author_cannot_delete_another_user_returns_403(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_2.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.author_2.refresh_from_db()
+        self.assertTrue(self.author_2.is_active)
+        self.assertIsNone(self.author_2.deleted_at)
+
+    def test_author_cannot_delete_self_returns_403(self):
+        self.client.force_authenticate(user=self.author_1)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.author_1.refresh_from_db()
+        self.assertTrue(self.author_1.is_active)
+        self.assertIsNone(self.author_1.deleted_at)
+
+    def test_admin_cannot_delete_self_returns_400(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.admin.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+        self.assertEqual(response.data["detail"], "No puedes desactivar tu propia cuenta.")
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+        self.assertIsNone(self.admin.deleted_at)
+
+    def test_admin_can_soft_delete_author_returns_204(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.author_1.refresh_from_db()
+        self.assertFalse(self.author_1.is_active)
+        self.assertIsNotNone(self.author_1.deleted_at)
+
+        # La fila persiste en all_objects pero desaparece de active_objects
+        self.assertTrue(User.all_objects.filter(id=self.author_1.id).exists())
+        self.assertFalse(User.active_objects.filter(id=self.author_1.id).exists())
+
+    def test_committee_can_soft_delete_author_returns_204(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.author_2.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.author_2.refresh_from_db()
+        self.assertFalse(self.author_2.is_active)
+        self.assertIsNotNone(self.author_2.deleted_at)
+        self.assertFalse(User.active_objects.filter(id=self.author_2.id).exists())
+
+    def test_soft_deleted_user_cannot_authenticate_with_prior_jwt(self):
+        # Emitir token JWT previo a la baja lógica
+        token = str(RefreshToken.for_user(self.author_1).access_token)
+
+        # Admin da de baja al autor
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        # El autor intenta usar su JWT previo
+        self.client.force_authenticate(user=None)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data.get("code"), "user_inactive")
+
+    def test_cannot_delete_already_soft_deleted_user_returns_404(self):
+        self.author_1.soft_delete()
+
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
