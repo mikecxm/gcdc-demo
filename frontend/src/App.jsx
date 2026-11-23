@@ -95,6 +95,11 @@ function App() {
         ? 'Autor'
         : 'Invitado';
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   if (currentView === 'workspace' && !session?.activeRole) {
     return <Navigate to="/login" replace />;
   }
@@ -215,7 +220,7 @@ function App() {
           2. ESPACIO DE TRABAJO (DASHBOARD SYMPOSIA + SIDEBAR)
          ======================================================== */}
       {currentView === 'workspace' && (
-        <div className="min-h-screen flex bg-slate-50 relative">
+        <div className="h-screen flex bg-slate-50 relative overflow-hidden">
           {/* Overlay de menú móvil */}
           {isMobileMenuOpen && (
             <div
@@ -226,11 +231,12 @@ function App() {
 
           {/* Sidebar Symposia (Desktop fijo, móvil deslizable) */}
           <aside
-            className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between transition-transform duration-200 md:static md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 p-5 flex flex-col justify-between transition-transform duration-200 md:static md:translate-x-0 md:h-screen md:shrink-0 ${
               isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
             }`}
           >
-            <div className="space-y-6">
+            {/* Encabezado fijo superior */}
+            <div className="shrink-0 space-y-6">
               {/* Brand */}
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-3">
@@ -274,112 +280,112 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                 </svg>
               </div>
-
-              {/* Menú de navegación */}
-              <nav className="space-y-1 text-xs text-left">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
-                  Espacio de Trabajo
-                </span>
-
-                {/* Ítem: Catálogo de Artículos (HU-08 / GCDC-144) */}
-                <button
-                  type="button"
-                  onClick={() => navigateTo('workspace', 'articulos')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
-                    workspaceTab === 'articulos'
-                      ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className={`w-4 h-4 ${
-                        workspaceTab === 'articulos' ? 'text-indigo-600' : 'text-slate-400'
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <span>Artículos y Postulaciones</span>
-                  </div>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                      workspaceTab === 'articulos'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    HU-08
-                  </span>
-                </button>
-
-                {/* Ítem: Directorio de Usuarios */}
-                <button
-                  type="button"
-                  onClick={() => navigateTo('workspace', 'usuarios')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
-                    workspaceTab === 'usuarios'
-                      ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <svg
-                      className={`w-4 h-4 ${
-                        workspaceTab === 'usuarios' ? 'text-indigo-600' : 'text-slate-400'
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                      />
-                    </svg>
-                    <span>Directorio de Usuarios</span>
-                  </div>
-                </button>
-
-                <div className="pt-2">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
-                    Otros Módulos
-                  </span>
-                  <a
-                    href="#agenda"
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:bg-slate-100 font-medium transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>Agenda del Evento</span>
-                  </a>
-
-                  <a
-                    href="#config"
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:bg-slate-100 font-medium transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>Configuración</span>
-                  </a>
-                </div>
-              </nav>
             </div>
 
+            {/* Menú de navegación central scrollable si la pantalla es baja */}
+            <nav className="flex-1 min-h-0 overflow-y-auto py-4 space-y-1 text-xs text-left">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
+                Espacio de Trabajo
+              </span>
+
+              {/* Ítem: Catálogo de Artículos (HU-08 / GCDC-144) */}
+              <button
+                type="button"
+                onClick={() => navigateTo('workspace', 'articulos')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                  workspaceTab === 'articulos'
+                    ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <svg
+                    className={`w-4 h-4 ${
+                      workspaceTab === 'articulos' ? 'text-indigo-600' : 'text-slate-400'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span>Artículos y Postulaciones</span>
+                </div>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                    workspaceTab === 'articulos'
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  HU-08
+                </span>
+              </button>
+
+              {/* Ítem: Directorio de Usuarios */}
+              <button
+                type="button"
+                onClick={() => navigateTo('workspace', 'usuarios')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                  workspaceTab === 'usuarios'
+                    ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <svg
+                    className={`w-4 h-4 ${
+                      workspaceTab === 'usuarios' ? 'text-indigo-600' : 'text-slate-400'
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                    />
+                  </svg>
+                  <span>Directorio de Usuarios</span>
+                </div>
+              </button>
+
+              <div className="pt-2">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
+                  Otros Módulos
+                </span>
+                <a
+                  href="#agenda"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:bg-slate-100 font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Agenda del Evento</span>
+                </a>
+
+                <a
+                  href="#config"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-slate-400 hover:bg-slate-100 font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>Configuración</span>
+                </a>
+              </div>
+            </nav>
+
             {/* Perfil del Usuario Autenticado en el pie del Sidebar */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+            <div className="shrink-0 pt-4 border-t border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5 text-left truncate">
                 <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
                   {userInitials}
@@ -393,16 +399,24 @@ function App() {
                   </span>
                 </div>
               </div>
-              <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500/30 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
             </div>
           </aside>
 
           {/* Área principal de contenido del Espacio de Trabajo */}
-          <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+          <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
             {/* Topbar del Dashboard */}
-            <header className="h-14 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+            <header className="h-14 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shrink-0">
               <div className="flex items-center gap-3">
                 {/* Botón Hamburger para pantallas móviles */}
                 <button
@@ -437,10 +451,7 @@ function App() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    logout();
-                    navigate('/login', { replace: true });
-                  }}
+                  onClick={handleLogout}
                   className="text-xs font-medium text-slate-600 hover:text-slate-900"
                 >
                   Cerrar sesión
