@@ -3,10 +3,12 @@ import { Clock, AlertCircle, CheckCircle2, XCircle, Award, FileText } from 'luci
 
 export type ArticleStatus =
   | 'POSTULADO'
-  | 'EN_EVALUACION'
+  | 'EN_REVISION'
   | 'ACEPTADO'
   | 'RECHAZADO'
-  | 'CON_AVAL';
+  | 'AVAL_PRESENTACION'
+  | 'AVAL_PUBLICACION'
+  | 'DESHABILITADO';
 
 export interface CoAuthor {
   id: number;
@@ -43,7 +45,17 @@ export interface Article {
   is_enabled: boolean;
   submitted_at: string;
   pdf_url: string;
+  submission_deadline?: string | null;
   coauthors: CoAuthor[];
+}
+
+export interface ArticleVersion {
+  id: number;
+  version_number: number;
+  stage: string;
+  uploaded_at: string;
+  pdf_url?: string;
+  file_name?: string;
 }
 
 export interface ArticleFilters {
@@ -70,9 +82,9 @@ export const getStatusBadgeConfig = (status: ArticleStatus): StatusBadgeConfig =
         border: 'border-amber-200',
         icon: Clock,
       };
-    case 'EN_EVALUACION':
+    case 'EN_REVISION':
       return {
-        label: 'En Evaluación',
+        label: 'En revisión',
         bg: 'bg-blue-50',
         text: 'text-blue-700',
         border: 'border-blue-200',
@@ -94,9 +106,13 @@ export const getStatusBadgeConfig = (status: ArticleStatus): StatusBadgeConfig =
         border: 'border-rose-200',
         icon: XCircle,
       };
-    case 'CON_AVAL':
+    case 'AVAL_PRESENTACION':
+    case 'AVAL_PUBLICACION':
       return {
-        label: 'Con Aval',
+        label:
+          status === 'AVAL_PRESENTACION'
+            ? 'Aval para presentación'
+            : 'Aval para publicación',
         bg: 'bg-purple-50',
         text: 'text-purple-700',
         border: 'border-purple-200',

@@ -9,12 +9,11 @@ class ReviewerAssignmentInputSerializer(serializers.Serializer):
     Recibe el ID del artículo y una lista de exactamente 3 IDs de jurados.
     """
 
-    article_id = serializers.IntegerField(required=True)
+    article_id = serializers.IntegerField()
     reviewer_ids = serializers.ListField(
         child=serializers.IntegerField(),
         min_length=3,
         max_length=3,
-        required=True,
         help_text="Lista de exactamente 3 IDs de miembros del comité a asignar como jurados.",
     )
 
@@ -46,15 +45,12 @@ class ReviewerAssignmentOutputSerializer(serializers.ModelSerializer):
 
 
 class ReviewerSuggestionSerializer(serializers.Serializer):
-    """Respuesta para las sugerencias de jurados balanceados (compatible con frontend)."""
+    """Respuesta para las sugerencias de jurados balanceados."""
 
     id = serializers.IntegerField()
     email = serializers.EmailField()
     full_name = serializers.CharField()
     affiliation = serializers.CharField()
-    roles = serializers.ListField(child=serializers.CharField(), default=["COMITE"])
-    thematic_lines = serializers.ListField(child=serializers.CharField(), default=[])
-    assigned_article_count = serializers.IntegerField(
+    current_assignments = serializers.IntegerField(
         help_text="Cantidad actual de artículos asignados como jurado."
     )
-    has_thematic_affinity = serializers.BooleanField(default=False)

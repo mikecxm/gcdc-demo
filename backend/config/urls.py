@@ -11,9 +11,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # API v1 - Módulos de dominio GCDC (Pre-registro para aislamiento entre ramas)
+        path('api/v1/auth/', include('apps.users.auth_urls')),
     path('api/v1/users/', include('apps.users.urls')),
     path('api/v1/conferences/', include('apps.conferences.urls')),
     path('api/v1/articles/', include('apps.articles.urls')),
+    path('api/articles/', include('apps.articles.urls')),
     path('api/v1/reviews/', include('apps.reviews.urls')),
     path('api/reviews/', include('apps.reviews.urls')),
 ]

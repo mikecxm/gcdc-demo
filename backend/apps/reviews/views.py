@@ -1,12 +1,10 @@
-from django.contrib.auth import get_user_model
-from django.db import models, transaction
+from django.db import transaction
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.conferences.models import Article, ArticleReviewer, ArticleStatus
-from apps.users.models import RoleName
 from apps.users.permissions import IsAdminOrCommittee
 
 from .serializers import (
@@ -16,19 +14,17 @@ from .serializers import (
 )
 from .services import get_balanced_reviewer_suggestions, validate_reviewer_conflicts
 
-User = get_user_model()
-
 
 class AssignReviewersView(APIView):
     """
-    POST /api/v1/reviews/assign-reviewers/ (y /api/reviews/assign-reviewers/)
-    GCDC-161 (HU-12): Servicio de asignación balanceada de 3 jurados con validación de conflictos.
+    POST /api/v1/reviews/assign-reviewers/
+    GCDC-161 (HU-12): Asignación de exactamente 3 jurados evaluadores a un artículo.
 
-    Reglas de negocio:
-    1. Solo usuarios autenticados con rol ADMIN o COMITE pueden realizar asignaciones.
-    2. Cada artículo postulado recibe exactamente 3 miembros del comité científico.
-    3. Validación de conflicto de interés: rechaza si el jurado es autor o coautor.
-    4. El artículo pasa automáticamente al estado EN_REVISION tras completarse la asignación.
+    Lógica:
+    - Solo usuarios con rol ADMIN o COMITE pueden realizar asignaciones.
+    - Valida conflictos de interés (autor, coautores, ya asignados, rol COMITE).
+    - Crea las 3 asignaciones en ArticleReviewer.
+    - Cambia el estado del artículo a EN_REVISION.
     """
 
     permission_classes = [IsAuthenticated, IsAdminOrCommittee]
@@ -41,57 +37,62 @@ class AssignReviewersView(APIView):
         article_id = data["article_id"]
         reviewer_ids = data["reviewer_ids"]
 
-        # 1. Obtener artículo activo
+        # 1. Buscar artículo activo y en estado válido
         try:
-            article = Article.objects.select_related("thematic_line", "responsible_author").get(
-                pk=article_id, is_enabled=True
-            )
+            article = Article.objects.get(pk=article_id, is_enabled=True)
         except Article.DoesNotExist:
             return Response(
-                {"detail": "Artículo no encontrado o se encuentra deshabilitado."},
+                {"detail": "Artículo no encontrado o deshabilitado."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # 2. Verificar que no tenga ya 3 jurados
-        existing_assignments = ArticleReviewer.objects.filter(article=article)
-        if existing_assignments.count() >= 3:
+        if article.status != ArticleStatus.POSTULADO:
             return Response(
-                {"detail": "Este artículo ya cuenta con exactamente 3 jurados asignados."},
+                {
+                    "detail": f"El artículo debe estar en estado POSTULADO para asignar jurados. "
+                    f"Estado actual: {article.status}."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. Verificar que el artículo no tenga ya 3 jurados
+        existing_count = ArticleReviewer.objects.filter(article=article).count()
+        if existing_count >= 3:
+            return Response(
+                {"detail": "Este artículo ya tiene 3 jurados asignados."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         # 3. Validar conflictos de interés
         conflict_errors = validate_reviewer_conflicts(article, reviewer_ids)
         if conflict_errors:
-            error_message = conflict_errors[0] if len(conflict_errors) == 1 else " ; ".join(conflict_errors)
             return Response(
-                {
-                    "detail": error_message,
-                    "errors": conflict_errors,
-                },
+                {"detail": conflict_errors},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 4. Transacción atómica: asignar los 3 jurados y actualizar estado a EN_REVISION
+        # 4. Crear asignaciones y actualizar estado del artículo
         with transaction.atomic():
-            new_assignments = []
+            assignments = []
             for reviewer_id in reviewer_ids:
                 assignment = ArticleReviewer.objects.create(
                     article=article,
                     reviewer_id=reviewer_id,
                 )
-                new_assignments.append(assignment)
+                assignments.append(assignment)
 
             article.status = ArticleStatus.EN_REVISION
             article.save(update_fields=["status"])
 
-        output_serializer = ReviewerAssignmentOutputSerializer(new_assignments, many=True)
+        # 5. Serializar respuesta
+        output_serializer = ReviewerAssignmentOutputSerializer(
+            assignments, many=True
+        )
         return Response(
             {
                 "article_id": article.id,
                 "article_title": article.title,
                 "article_status": article.status,
-                "message": "Los 3 jurados fueron asignados con éxito y el artículo cambió al estado EN_REVISION.",
                 "assignments": output_serializer.data,
             },
             status=status.HTTP_200_OK,
@@ -101,8 +102,7 @@ class AssignReviewersView(APIView):
 class SuggestReviewersView(APIView):
     """
     GET /api/v1/reviews/suggest-reviewers/?article_id=<id>
-    Retorna sugerencias balanceadas de jurados considerando línea temática y menor carga asignada,
-    excluyendo conflictos de interés.
+    Sugiere jurados balanceados por carga de trabajo, excluyendo conflictos de interés.
     """
 
     permission_classes = [IsAuthenticated, IsAdminOrCommittee]
@@ -111,56 +111,18 @@ class SuggestReviewersView(APIView):
         article_id = request.query_params.get("article_id")
         if not article_id:
             return Response(
-                {"detail": "El parámetro article_id es obligatorio."},
+                {"detail": "Se requiere el parámetro article_id."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            article = Article.objects.select_related("thematic_line", "responsible_author").get(
-                pk=article_id, is_enabled=True
-            )
+            article = Article.objects.get(pk=article_id, is_enabled=True)
         except Article.DoesNotExist:
             return Response(
                 {"detail": "Artículo no encontrado o deshabilitado."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        suggestions = get_balanced_reviewer_suggestions(article)
-        serializer = ReviewerSuggestionSerializer(suggestions, many=True)
+        candidates = get_balanced_reviewer_suggestions(article)
+        serializer = ReviewerSuggestionSerializer(candidates, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class CommitteeMembersListView(APIView):
-    """
-    GET /api/v1/reviews/committee-members/
-    Lista todos los miembros del comité activos con su carga actual de asignaciones.
-    Utilizado por el panel frontend de asignación.
-    """
-
-    permission_classes = [IsAuthenticated, IsAdminOrCommittee]
-
-    def get(self, request):
-        members = (
-            User.objects.filter(
-                is_active=True,
-                deleted_at__isnull=True,
-                user_roles__role__name=RoleName.COMITE,
-            )
-            .annotate(assigned_article_count=models.Count("reviewer_assignments"))
-            .order_by("full_name")
-            .distinct()
-        )
-
-        data = [
-            {
-                "id": m.id,
-                "email": m.email,
-                "full_name": m.full_name,
-                "affiliation": m.affiliation,
-                "roles": ["COMITE"],
-                "thematic_lines": [],
-                "assigned_article_count": m.assigned_article_count,
-            }
-            for m in members
-        ]
-        return Response(data, status=status.HTTP_200_OK)

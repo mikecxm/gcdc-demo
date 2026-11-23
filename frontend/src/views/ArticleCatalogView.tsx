@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '../context';
-import { getArticles, THEMATIC_LINES, ARTICLE_STATUSES } from '../services/articlesApi';
-import type { Article } from '../types/article';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  getArticleApiErrorMessage,
+  getArticles,
+  getThematicLines,
+  ARTICLE_STATUSES,
+} from '../services/articlesApi';
+import type { Article, ArticleStatus } from '../types/article';
+import type { ThematicLine } from '../services/articlesApi';
 import { getStatusBadgeConfig } from '../types/article';
 import { ArticleDetailModal } from '../components/articles/ArticleDetailModal';
 import {
@@ -14,119 +19,95 @@ import {
   Users,
   Eye,
   Building2,
-  Shield,
   Layers,
-  Sparkles,
   Info,
+  CheckCircle2,
 } from 'lucide-react';
-import type { UserRole } from '../services/api';
+
+const isArticleStatus = (value: string): value is ArticleStatus =>
+  ARTICLE_STATUSES.some((status) => status.value === value);
 
 export const ArticleCatalogView: React.FC = () => {
-  const { user, role, setDevRole } = useAuth();
-
   // Estados de datos
   const [allArticles, setAllArticles] = useState<Article[]>([]);
+  const [thematicLines, setThematicLines] = useState<ThematicLine[]>([]);
+  const [isLoadingThematicLines, setIsLoadingThematicLines] = useState<boolean>(true);
+  const [thematicLinesError, setThematicLinesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isFallbackData, setIsFallbackData] = useState<boolean>(false);
 
   // Estados de filtros
   const [selectedThematicLine, setSelectedThematicLine] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<ArticleStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Estado del Modal de Detalle
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [disableSuccessNotification, setDisableSuccessNotification] = useState<{
+    articleId: number;
+    message: string;
+  } | null>(null);
 
-  // Cargar artículos desde el servicio
-  const loadArticles = async () => {
+  const loadThematicLines = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setThematicLines(await getThematicLines(signal));
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error('Error al cargar líneas temáticas:', err);
+      setThematicLinesError(getArticleApiErrorMessage(err));
+    } finally {
+      if (!signal?.aborted) setIsLoadingThematicLines(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => void loadThematicLines(controller.signal),
+      0
+    );
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadThematicLines]);
+
+  const loadArticles = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await getArticles();
+      const response = await getArticles(
+        {
+          thematic_line: selectedThematicLine === 'ALL' ? undefined : selectedThematicLine,
+          status: selectedStatus === 'ALL' ? undefined : selectedStatus,
+          search: searchQuery.trim() || undefined,
+        },
+        signal
+      );
       setAllArticles(response.data);
-      setIsFallbackData(response.isFallback);
     } catch (err) {
+      if (signal?.aborted) return;
       console.error('Error al cargar artículos:', err);
-      setError('No fue posible cargar el catálogo de artículos. Inténtalo nuevamente.');
+      setError(getArticleApiErrorMessage(err));
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
-  };
+  }, [searchQuery, selectedStatus, selectedThematicLine]);
 
   useEffect(() => {
-    let isMounted = true;
-    getArticles()
-      .then((response) => {
-        if (isMounted) {
-          setAllArticles(response.data);
-          setIsFallbackData(response.isFallback);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.error('Error al cargar artículos:', err);
-          setError('No fue posible cargar el catálogo de artículos. Inténtalo nuevamente.');
-          setIsLoading(false);
-        }
-      });
-
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => void loadArticles(controller.signal),
+      searchQuery.trim() ? 300 : 0
+    );
     return () => {
-      isMounted = false;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
-  }, []);
+  }, [loadArticles, searchQuery]);
 
-  /**
-   * REGLA VISUAL DE PRIVACIDAD:
-   * - AUTOR: Solo ve sus propios artículos activos (coincidencia por ID o email del autor responsable).
-   * - COMITE o ADMIN: Ven todo el catálogo de artículos activos.
-   */
-  const scopedArticles = useMemo(() => {
-    if (!user) return allArticles;
-
-    if (role === 'AUTOR') {
-      return allArticles.filter(
-        (article) =>
-          article.responsible_author.id === user.id ||
-          article.responsible_author.email.toLowerCase() === user.email.toLowerCase()
-      );
-    }
-
-    // COMITE y ADMIN ven todos los artículos activos
-    return allArticles;
-  }, [allArticles, role, user]);
-
-  /**
-   * FILTROS COMBINADOS EN TIEMPO REAL:
-   * 1. Línea Temática
-   * 2. Estado del artículo
-   * 3. Búsqueda por texto (título, autor o resumen)
-   */
-  const filteredArticles = useMemo(() => {
-    return scopedArticles.filter((article) => {
-      // Filtro de Línea Temática
-      const matchesThematicLine =
-        selectedThematicLine === 'ALL' || article.thematic_line === selectedThematicLine;
-
-      // Filtro de Estado
-      const matchesStatus =
-        selectedStatus === 'ALL' || article.status === selectedStatus;
-
-      // Filtro de Búsqueda
-      const query = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        query === '' ||
-        article.title.toLowerCase().includes(query) ||
-        article.abstract.toLowerCase().includes(query) ||
-        article.responsible_author.full_name.toLowerCase().includes(query) ||
-        article.responsible_author.affiliation.toLowerCase().includes(query) ||
-        article.keywords.toLowerCase().includes(query);
-
-      return matchesThematicLine && matchesStatus && matchesSearch;
-    });
-  }, [scopedArticles, selectedThematicLine, selectedStatus, searchQuery]);
+  const filteredArticles = allArticles;
 
   const handleClearFilters = () => {
     setSelectedThematicLine('ALL');
@@ -144,13 +125,32 @@ export const ArticleCatalogView: React.FC = () => {
     setSelectedArticle(null);
   };
 
+  const handleArticleDisabled = (articleId: number, reason: string) => {
+    // 1. Retirar inmediatamente el artículo del listado de artículos activos en React
+    setAllArticles((prevArticles) =>
+      prevArticles.filter((item) => item.id !== articleId)
+    );
+
+    // 2. Cerrar modales
+    setIsModalOpen(false);
+    setSelectedArticle(null);
+
+    // 3. Mostrar banner / toast de confirmación
+    setDisableSuccessNotification({
+      articleId,
+      message: `El artículo #${articleId} fue deshabilitado exitosamente ("${reason.slice(0, 40)}${
+        reason.length > 40 ? '...' : ''
+      }") y retirado del catálogo activo y de la agenda.`,
+    });
+  };
+
   const hasActiveFilters =
     selectedThematicLine !== 'ALL' || selectedStatus !== 'ALL' || searchQuery.trim() !== '';
 
   return (
     <div className="w-full space-y-6 text-left">
       {/* ========================================================
-          1. HEADER Y BARRA DE ROL ACTIVO (FALLBACK / TESTING)
+          1. HEADER DEL CATÁLOGO
          ======================================================== */}
       <div className="space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200">
@@ -173,71 +173,41 @@ export const ArticleCatalogView: React.FC = () => {
             </p>
           </div>
 
-          {/* Switcher Rápido de Rol para Pruebas de Privacidad */}
-          <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5 px-2 text-slate-500 font-medium">
-              <Shield className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Vista actual como:</span>
-            </div>
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-              {(['AUTOR', 'COMITE', 'ADMIN'] as UserRole[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setDevRole(r)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    role === r
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                  }`}
-                >
-                  {r === 'AUTOR' ? 'Autor' : r === 'COMITE' ? 'Comité' : 'Admin'}
-                </button>
-              ))}
-            </div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-xs">
+            El acceso y los artículos visibles se determinan mediante tu sesión en el servidor.
           </div>
         </div>
 
-        {/* Banner Informativo de la Regla de Privacidad */}
-        <div
-          className={`p-3.5 rounded-xl border flex items-start gap-3 text-xs ${
-            role === 'AUTOR'
-              ? 'bg-amber-50/70 border-amber-200/80 text-amber-900'
-              : 'bg-indigo-50/70 border-indigo-200/80 text-indigo-900'
-          }`}
-        >
-          <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 space-y-0.5">
-            <span className="font-semibold block">
-              {role === 'AUTOR'
-                ? 'Modo Autor Activado (Privacidad Estricta)'
-                : `Modo ${role === 'COMITE' ? 'Comité Científico' : 'Administrador'} Activado`}
-            </span>
-            <p className="text-[11px] leading-relaxed opacity-90">
-              {role === 'AUTOR'
-                ? `Como autor registrado (${user?.full_name || 'Dr. Carlos Mendoza'}), solo tienes acceso a tus propios artículos postulados (${scopedArticles.length} en total).`
-                : `Tienes permisos para examinar todos los artículos activos postulados por los autores en la conferencia (${scopedArticles.length} en total).`}
-            </p>
-          </div>
-        </div>
-
-        {/* Aviso de Modo Demo si se usan datos simulados */}
-        {isFallbackData && (
-          <div className="px-3 py-2 rounded-lg bg-slate-100 border border-slate-200/80 text-[11px] text-slate-600 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              <span>
-                <strong>Modo Demostración:</strong> El endpoint <code className="font-mono text-indigo-600">GET /articles/</code> aún no está expuesto en backend; usando datos de prueba activos.
-              </span>
+        {/* Notificación de éxito tras deshabilitar un artículo */}
+        {disableSuccessNotification && (
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs text-left">
+                <span className="font-bold text-emerald-950 block">Artículo deshabilitado con éxito</span>
+                <p className="text-emerald-800 leading-relaxed">{disableSuccessNotification.message}</p>
+              </div>
             </div>
             <button
-              onClick={loadArticles}
-              className="text-indigo-600 hover:underline font-semibold flex-shrink-0"
+              type="button"
+              onClick={() => setDisableSuccessNotification(null)}
+              className="text-emerald-700 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors"
+              aria-label="Cerrar notificación"
             >
-              Reintentar API
+              ✕
             </button>
           </div>
         )}
+
+        <div className="p-3.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 text-indigo-900 flex items-start gap-3 text-xs">
+          <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-0.5">
+            <span className="font-semibold block">Visibilidad aplicada por el backend</span>
+            <p className="text-[11px] leading-relaxed opacity-90">
+              La API valida tu token, limita los artículos según tus permisos y excluye los deshabilitados.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ========================================================
@@ -252,7 +222,7 @@ export const ArticleCatalogView: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por título, autor, abstract o palabras clave..."
+              placeholder="Buscar por título, resumen o palabras clave..."
               className="w-full h-10 pl-10 pr-4 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all"
             />
             {searchQuery && (
@@ -277,12 +247,17 @@ export const ArticleCatalogView: React.FC = () => {
                 id="filter-thematic-line"
                 value={selectedThematicLine}
                 onChange={(e) => setSelectedThematicLine(e.target.value)}
+                disabled={isLoadingThematicLines}
                 className="w-full h-10 pl-9 pr-8 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all appearance-none cursor-pointer"
               >
-                <option value="ALL">Todas las líneas temáticas</option>
-                {THEMATIC_LINES.map((line) => (
-                  <option key={line} value={line}>
-                    {line}
+                <option value="ALL">
+                  {isLoadingThematicLines
+                    ? 'Cargando líneas temáticas...'
+                    : 'Todas las líneas temáticas'}
+                </option>
+                {thematicLines.map((line) => (
+                  <option key={line.id} value={line.name}>
+                    {line.name}
                   </option>
                 ))}
               </select>
@@ -290,6 +265,24 @@ export const ArticleCatalogView: React.FC = () => {
                 ▼
               </div>
             </div>
+            {thematicLinesError && (
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-rose-600">
+                <span className="break-words">
+                  No se pudieron cargar las líneas temáticas: {thematicLinesError}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoadingThematicLines(true);
+                    setThematicLinesError(null);
+                    void loadThematicLines();
+                  }}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Select: Estado del Artículo */}
@@ -302,7 +295,12 @@ export const ArticleCatalogView: React.FC = () => {
               <select
                 id="filter-status"
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedStatus(
+                    value === 'ALL' || isArticleStatus(value) ? value : 'ALL'
+                  );
+                }}
                 className="w-full h-10 pl-9 pr-8 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white transition-all appearance-none cursor-pointer"
               >
                 <option value="ALL">Todos los estados</option>
@@ -334,11 +332,8 @@ export const ArticleCatalogView: React.FC = () => {
         {/* Barra de Conteo y Resumen de Resultados */}
         <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
           <div>
-            Mostrando{' '}
             <span className="font-bold text-slate-900">{filteredArticles.length}</span>{' '}
-            de{' '}
-            <span className="font-bold text-slate-900">{scopedArticles.length}</span>{' '}
-            artículos disponibles
+            artículos encontrados
           </div>
 
           {hasActiveFilters && (
@@ -375,7 +370,7 @@ export const ArticleCatalogView: React.FC = () => {
           <p className="text-sm font-semibold text-rose-700">{error}</p>
           <button
             type="button"
-            onClick={loadArticles}
+            onClick={() => void loadArticles()}
             className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors"
           >
             Reintentar
@@ -392,8 +387,6 @@ export const ArticleCatalogView: React.FC = () => {
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {hasActiveFilters
               ? 'No hay artículos que coincidan con la combinación de filtros seleccionada. Prueba modificando los parámetros.'
-              : role === 'AUTOR'
-              ? 'No tienes artículos postulados activos actualmente con esta cuenta.'
               : 'No hay artículos registrados en el catálogo en este momento.'}
           </p>
           {hasActiveFilters && (
@@ -497,9 +490,11 @@ export const ArticleCatalogView: React.FC = () => {
           4. MODAL DE DETALLE Y VISOR PDF EMBEBIDO
          ======================================================== */}
       <ArticleDetailModal
+        key={selectedArticle?.id}
         article={selectedArticle}
         isOpen={isModalOpen}
         onClose={handleCloseDetail}
+        onArticleDisabled={handleArticleDisabled}
       />
     </div>
   );

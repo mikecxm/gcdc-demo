@@ -1,0 +1,18 @@
+[2026-11-21 12:48:18,772] DESKTOP-T2OO3QL/INFO/locust.main: Starting Locust 2.47.0
+[2026-11-21 12:48:18,773] DESKTOP-T2OO3QL/INFO/locust.main: Run time limit set to 15 seconds
+[2026-11-21 12:48:18,774] DESKTOP-T2OO3QL/INFO/locust.runners: Ramping to 50 users at a rate of 50.00 per second
+[2026-11-21 12:48:18,777] DESKTOP-T2OO3QL/INFO/locust.runners: All users spawned: {"UserDirectoryLoad": 50} (50 total users)
+[2026-11-21 12:48:33,326] DESKTOP-T2OO3QL/INFO/locust.main: --run-time limit reached, shutting down
+[2026-11-21 12:48:33,546] DESKTOP-T2OO3QL/INFO/locust.main: Shutting down (exit code 0)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      /api/v1/users/?role=AUTOR&affiliation=%C3%B1+%26+O%27Hara+%2B+100%25_&is_active=true    2270     0(0.00%) |    121       9    1268    110 |  154.28        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                      2270     0(0.00%) |    121       9    1268    110 |  154.28        0.00
+
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+GET      /api/v1/users/?role=AUTOR&affiliation=%C3%B1+%26+O%27Hara+%2B+100%25_&is_active=true      110    120    120    130    170    210    240    640   1200   1300   1300   2270
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+         Aggregated                                                                            110    120    120    130    170    210    240    640   1200   1300   1300   2270

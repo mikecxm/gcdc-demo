@@ -1,25 +1,24 @@
+import axios from 'axios';
 import { apiClient } from './api';
-import type { Article, CommitteeMember } from '../types/article';
+import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
 
-export const THEMATIC_LINES: string[] = [
-  'Inteligencia Artificial',
-  'Ingeniería de Software',
-  'Sistemas Distribuidos',
-  'Ciberseguridad',
-  'Ciencia de Datos',
-];
+export interface ThematicLine {
+  id: number;
+  name: string;
+}
 
-export const ARTICLE_STATUSES: { value: string; label: string }[] = [
+export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
   { value: 'POSTULADO', label: 'Postulado' },
-  { value: 'EN_EVALUACION', label: 'En Evaluación' },
+  { value: 'EN_REVISION', label: 'En revisión' },
   { value: 'ACEPTADO', label: 'Aceptado' },
   { value: 'RECHAZADO', label: 'Rechazado' },
-  { value: 'CON_AVAL', label: 'Con Aval' },
+  { value: 'AVAL_PRESENTACION', label: 'Aval para presentación' },
+  { value: 'AVAL_PUBLICACION', label: 'Aval para publicación' },
 ];
 
 export const MOCK_ARTICLES: Article[] = [
   {
-    id: 1,
+    id: 101,
     title: 'Optimización de Modelos Fundacionales para Detección Temprana de Plagas en Cultivos de Caña',
     abstract:
       'Este trabajo presenta un enfoque novedoso basado en visión por computadora y modelos fundacionales ligeros adaptados para la identificación temprana de anomalías en cultivos agrícolas del Valle del Cauca. Se evalúa el desempeño en inferencia en el borde (edge computing) con una precisión de F1-Score superior al 94.2% frente a perturbaciones climáticas extremas.',
@@ -34,7 +33,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: true,
     submitted_at: '2026-10-18T14:32:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 11,
@@ -53,7 +52,7 @@ export const MOCK_ARTICLES: Article[] = [
     ],
   },
   {
-    id: 2,
+    id: 102,
     title: 'Arquitectura de Microservicios Resilientes con Consenso Raft para Sistemas de Salud',
     abstract:
       'Analizamos la implementación de un clúster distribuido tolerante a particiones de red para la historia clínica interoperable en el suroccidente colombiano. Se demuestra cómo mitigar estados inconsistentes y latencias críticas bajo condiciones de alta concurrencia y conectividad intermitente.',
@@ -65,14 +64,14 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'carlos.mendoza@correounivalle.edu.co',
       affiliation: 'Universidad del Valle - Escuela de Ing. de Sistemas',
     },
-    status: 'EN_EVALUACION',
+    status: 'EN_REVISION',
     is_enabled: true,
     submitted_at: '2026-10-12T09:15:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [],
   },
   {
-    id: 3,
+    id: 103,
     title: 'Framework para la Verificación Formal de Smart Contracts en Redes Blockchain de Segunda Capa',
     abstract:
       'Proponemos una metodología de análisis estático y verificación formal aplicada a contratos inteligentes financieros. Mediante demostración automática de teoremas reducimos en un 87% las vulnerabilidades por reentrancia, desbordamiento aritmético y fallos de aserción en protocolos DeFi.',
@@ -87,7 +86,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'ACEPTADO',
     is_enabled: true,
     submitted_at: '2026-09-28T16:45:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 13,
@@ -111,10 +110,10 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'maria.ortiz@javerianacali.edu.co',
       affiliation: 'Pontificia Universidad Javeriana Cali',
     },
-    status: 'CON_AVAL',
+    status: 'AVAL_PRESENTACION',
     is_enabled: true,
     submitted_at: '2026-09-15T11:20:00Z',
-    pdf_url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 14,
@@ -148,7 +147,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'RECHAZADO',
     is_enabled: true,
     submitted_at: '2026-08-30T17:10:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 16,
@@ -172,10 +171,10 @@ export const MOCK_ARTICLES: Article[] = [
       email: 'carlos.mendoza@correounivalle.edu.co',
       affiliation: 'Universidad del Valle - Escuela de Ing. de Sistemas',
     },
-    status: 'CON_AVAL',
+    status: 'AVAL_PUBLICACION',
     is_enabled: true,
     submitted_at: '2026-10-05T08:50:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [
       {
         id: 17,
@@ -201,7 +200,7 @@ export const MOCK_ARTICLES: Article[] = [
     status: 'POSTULADO',
     is_enabled: false, // Inactivo: debe ser filtrado
     submitted_at: '2026-07-20T10:00:00Z',
-    pdf_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+    pdf_url: '/manuscript-sample.pdf',
     coauthors: [],
   },
 ];
@@ -275,41 +274,154 @@ export const MOCK_COMMITTEE_MEMBERS: CommitteeMember[] = [
 
 export interface FetchArticlesResponse {
   data: Article[];
-  isFallback: boolean;
   total: number;
 }
 
-/**
- * Obtiene la lista de artículos desde el backend (/articles/ o /api/articles/).
- * Si el endpoint aún no está disponible o falla, retorna automáticamente los datos mock de respaldo.
- */
-export const getArticles = async (): Promise<FetchArticlesResponse> => {
-  try {
-    const response = await apiClient.get<Article[]>('/articles/');
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return {
-        data: response.data.filter((art) => art.is_enabled),
-        isFallback: false,
-        total: response.data.length,
-      };
-    }
-    // Si la API responde con un arreglo vacío, usamos el mock para permitir evaluar la interfaz
-    return {
-      data: MOCK_ARTICLES.filter((art) => art.is_enabled),
-      isFallback: true,
-      total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
-    };
-  } catch (err) {
-    console.warn(
-      '[Symposia Articles] El endpoint /articles/ aún no está disponible en el backend. Usando datos simulados (Mock Data):',
-      err
-    );
-    return {
-      data: MOCK_ARTICLES.filter((art) => art.is_enabled),
-      isFallback: true,
-      total: MOCK_ARTICLES.filter((art) => art.is_enabled).length,
-    };
+export interface ArticleListFilters {
+  thematic_line?: string;
+  status?: ArticleStatus;
+  search?: string;
+}
+
+export const getArticleApiErrorMessage = (error: unknown): string => {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
   }
+
+  if (!error.response) {
+    return 'No fue posible conectarse con el servidor. Verifica que el backend esté en ejecución.';
+  }
+
+  const data: unknown = error.response.data;
+  let message: string | undefined;
+
+  if (typeof data === 'string') {
+    message = data.trim() || undefined;
+  } else if (typeof data === 'object' && data !== null) {
+    const payload = data as Record<string, unknown>;
+    const value = payload.detail ?? payload.non_field_errors ?? Object.values(payload)[0];
+    if (typeof value === 'string') {
+      message = value;
+    } else if (Array.isArray(value)) {
+      message = value.filter((item): item is string => typeof item === 'string').join(', ');
+    }
+  }
+
+  if (message) return message;
+  if (error.response.status === 401) return 'Inicia sesión con una cuenta válida para consultar los artículos.';
+  if (error.response.status === 403) return 'No tienes permiso para consultar estos artículos.';
+  if (error.response.status === 404) return 'El recurso solicitado no existe en el servidor.';
+  return `El servidor respondió con el código ${error.response.status}.`;
+};
+
+export const getArticleVersions = async (
+  articleId: number,
+  token?: string
+): Promise<ArticleVersion[]> => {
+  const response = await apiClient.get<ArticleVersion[]>(
+    `/articles/${articleId}/versions/`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+  );
+  return response.data;
+};
+
+export const getThematicLines = async (
+  signal?: AbortSignal
+): Promise<ThematicLine[]> => {
+  const response = await apiClient.get<ThematicLine[]>(
+    '/conferences/thematic-lines/',
+    { signal }
+  );
+
+  if (
+    !Array.isArray(response.data) ||
+    !response.data.every(
+      (line) =>
+        typeof line.id === 'number' &&
+        typeof line.name === 'string'
+    )
+  ) {
+    throw new Error('El servidor devolvió un formato de líneas temáticas no válido.');
+  }
+
+  return response.data;
+};
+
+export const uploadArticleVersion = async (
+  articleId: number,
+  formData: FormData,
+  token?: string
+) => {
+  return apiClient.post<ArticleVersion>(
+    `/articles/${articleId}/versions/`,
+    formData,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+};
+
+/** Obtiene artículos activos desde la API y aplica los filtros combinados del catálogo. */
+export const getArticles = async (
+  filters: ArticleListFilters = {},
+  signal?: AbortSignal
+): Promise<FetchArticlesResponse> => {
+  const params = {
+    ...(filters.thematic_line ? { thematic_line: filters.thematic_line } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.search ? { search: filters.search } : {}),
+  };
+  const response = await apiClient.get<Article[]>('/articles/', { params, signal });
+
+  if (!Array.isArray(response.data)) {
+    throw new Error('El servidor devolvió un formato de listado de artículos no válido.');
+  }
+
+  return { data: response.data, total: response.data.length };
+};
+
+/**
+ * Obtiene el detalle de un artículo específico por su ID desde el backend (/articles/{id}/).
+ */
+export const getArticleById = async (id: number, signal?: AbortSignal): Promise<Article> => {
+  const response = await apiClient.get<Article>(`/articles/${id}/`, { signal });
+  return response.data;
+};
+
+/** Descarga autenticada; nunca interpreta una ruta de almacenamiento como URL pública. */
+export const getArticlePdf = async (
+  id: number,
+  signal?: AbortSignal,
+  versionNumber?: number
+): Promise<Blob> => {
+  const { data } = await apiClient.get<Blob>(`/articles/${id}/pdf/`, {
+    responseType: 'blob',
+    signal,
+    params: versionNumber === undefined ? undefined : { version_number: versionNumber },
+  });
+  if (data.type.split(';')[0] !== 'application/pdf' || await data.slice(0, 5).text() !== '%PDF-') {
+    throw new Error('El servidor no devolvió un documento PDF válido.');
+  }
+  return data;
+};
+
+export interface DisableArticleResponse {
+  id: number;
+  status: ArticleStatus;
+  is_enabled: boolean;
+  disabled_reason: string;
+  disabled_at: string;
+}
+
+export const disableArticle = async (
+  articleId: number,
+  reason: string
+): Promise<DisableArticleResponse> => {
+  const response = await apiClient.post<DisableArticleResponse>(
+    `/articles/${articleId}/disable/`,
+    { reason }
+  );
+  return response.data;
 };
 
 export interface AssignReviewersPayload {
