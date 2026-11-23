@@ -69,7 +69,7 @@ class ArticleVersionTests(TestCase):
             article=self.article,
             version_number=1,
             stage=VersionStage.INICIAL,
-            pdf_url="articles/1/v1.pdf",
+            pdf_url=f"articles/{self.article.pk}/v1.pdf",
         )
         self.url = f"/api/v1/articles/{self.article.id}/versions/"
         self.client = APIClient()
