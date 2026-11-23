@@ -50,10 +50,12 @@ class ArticleDisableTests(TestCase):
         self.article.refresh_from_db()
         self.assertTrue(self.article.is_enabled)
 
-    def test_admin_without_committee_role_is_rejected(self):
+    def test_admin_can_disable_article(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.post(self.url, {"reason": "Prueba"}, format="json")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.article.refresh_from_db()
+        self.assertFalse(self.article.is_enabled)
 
     def test_anonymous_cannot_disable_article(self):
         response = self.client.post(self.url, {"reason": "Prueba"}, format="json")

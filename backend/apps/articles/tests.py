@@ -285,6 +285,18 @@ class ArticleEndpointsTests(APITestCase):
         self.assertEqual(len(response.data["coauthors"]), 1)
         self.assertEqual(response.data["coauthors"][0]["full_name"], "Ing. Mateo Gómez")
 
+    def test_article_detail_includes_submission_deadline(self):
+        self.client.force_authenticate(user=self.author1)
+        url = reverse("article-detail", kwargs={"pk": self.art_author1_ia.pk})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json()["submission_deadline"],
+            self.conference.submission_deadline.isoformat(),
+        )
+
     def test_author_cannot_view_other_authors_article_detail_forbidden(self):
         """
         Criterio de Aceptación (DoD 2 - GCDC-145):

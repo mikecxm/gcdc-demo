@@ -2,13 +2,10 @@ import axios from 'axios';
 import { apiClient } from './api';
 import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
 
-export const THEMATIC_LINES: string[] = [
-  'Inteligencia Artificial',
-  'Ingeniería de Software',
-  'Sistemas Distribuidos',
-  'Ciberseguridad',
-  'Ciencia de Datos',
-];
+export interface ThematicLine {
+  id: number;
+  name: string;
+}
 
 export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
   { value: 'POSTULADO', label: 'Postulado' },
@@ -261,17 +258,38 @@ export const getArticleVersions = async (
   return response.data;
 };
 
-export const replaceArticlePdf = async (articleId: number, pdf: File, token?: string) => {
-  const formData = new FormData();
-  formData.append('pdf', pdf);
+export const getThematicLines = async (
+  signal?: AbortSignal
+): Promise<ThematicLine[]> => {
+  const response = await apiClient.get<ThematicLine[]>(
+    '/conferences/thematic-lines/',
+    { signal }
+  );
+
+  if (
+    !Array.isArray(response.data) ||
+    !response.data.every(
+      (line) =>
+        typeof line.id === 'number' &&
+        typeof line.name === 'string'
+    )
+  ) {
+    throw new Error('El servidor devolvió un formato de líneas temáticas no válido.');
+  }
+
+  return response.data;
+};
+
+export const uploadArticleVersion = async (
+  articleId: number,
+  formData: FormData,
+  token?: string
+) => {
   return apiClient.post<ArticleVersion>(
     `/articles/${articleId}/versions/`,
     formData,
     {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     }
   );
 };
@@ -301,6 +319,23 @@ export const getArticles = async (
 export const getArticleById = async (id: number, signal?: AbortSignal): Promise<Article> => {
   const response = await apiClient.get<Article>(`/articles/${id}/`, { signal });
   return response.data;
+};
+
+/** Descarga autenticada; nunca interpreta una ruta de almacenamiento como URL pública. */
+export const getArticlePdf = async (
+  id: number,
+  signal?: AbortSignal,
+  versionNumber?: number
+): Promise<Blob> => {
+  const { data } = await apiClient.get<Blob>(`/articles/${id}/pdf/`, {
+    responseType: 'blob',
+    signal,
+    params: versionNumber === undefined ? undefined : { version_number: versionNumber },
+  });
+  if (data.type.split(';')[0] !== 'application/pdf' || await data.slice(0, 5).text() !== '%PDF-') {
+    throw new Error('El servidor no devolvió un documento PDF válido.');
+  }
+  return data;
 };
 
 export interface DisableArticleResponse {

@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { UserListView } from './components/users/UserListView';
+import { loadConfiguredUsers } from './services/usersApi';
 import { UserCreationForm } from './components/users/UserCreationForm';
+import { ArticleSubmissionForm } from './components/articles/ArticleSubmissionForm';
 import { ArticleCatalogView } from './views/ArticleCatalogView';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/SessionContext';
@@ -12,6 +15,7 @@ function App() {
   const navigate = useNavigate();
   const user = session ? { full_name: session.fullName } : null;
   const role = session?.activeRole;
+  const canManageUsers = session?.roles.some((userRole) => userRole === 'ADMIN' || userRole === 'COMITE');
 
   // Estados de navegación y vistas
   const [currentView, setCurrentView] = useState(() => {
@@ -36,6 +40,7 @@ function App() {
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
+  const [isSubmissionOpen, setIsSubmissionOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [lastCreatedUser, setLastCreatedUser] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -60,6 +65,7 @@ function App() {
   }, []);
 
   const navigateTo = (view, tab) => {
+    setIsSubmissionOpen(false);
     setCurrentView(view);
     setIsMobileMenuOpen(false);
     if (tab) {
@@ -91,6 +97,10 @@ function App() {
 
   if (currentView === 'workspace' && !session?.activeRole) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (currentView === 'workspace' && workspaceTab === 'articulos' && isSubmissionOpen && role === 'AUTOR') {
+    return <ArticleSubmissionForm onBackToMenu={() => navigateTo('workspace', 'articulos')} />;
   }
 
   return (
@@ -338,9 +348,6 @@ function App() {
                     </svg>
                     <span>Directorio de Usuarios</span>
                   </div>
-                  <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-semibold">
-                    128
-                  </span>
                 </button>
 
                 <div className="pt-2">
@@ -443,118 +450,18 @@ function App() {
 
             {/* Contenido dinámico según la pestaña activa */}
             <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
-              {workspaceTab === 'articulos' && <ArticleCatalogView />}
+              {workspaceTab === 'articulos' && (
+                  <>
+                    {role === 'AUTOR' && <div className="flex justify-end"><button type="button" onClick={() => setIsSubmissionOpen(true)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Postular artículo</button></div>}
+                    <ArticleCatalogView />
+                  </>
+              )}
 
               {workspaceTab === 'usuarios' && (
-                <div className="space-y-6 text-left">
-                  {/* Título de la página y botón primario de acción */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-600 tracking-wider uppercase block">
-                        PERSONAS Y PERMISOS
-                      </span>
-                      <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-                        Directorio de Usuarios
-                      </h1>
-                      <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                        Gestiona los usuarios y roles asignados a la conferencia.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsAdminModalOpen(true)}
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs sm:text-sm rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 self-start sm:self-auto"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span>+ Añadir Usuario</span>
-                    </button>
-                  </div>
-
-                  {/* Tarjetas KPI de métricas */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-                      <span className="text-xs text-slate-500 block">Total de Usuarios</span>
-                      <span className="text-2xl font-bold text-indigo-600 mt-1 block">128</span>
-                    </div>
-                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-                      <span className="text-xs text-slate-500 block">Administradores</span>
-                      <span className="text-2xl font-bold text-slate-900 mt-1 block">8</span>
-                    </div>
-                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-                      <span className="text-xs text-slate-500 block">Comité Científico</span>
-                      <span className="text-2xl font-bold text-slate-900 mt-1 block">24</span>
-                    </div>
-                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-                      <span className="text-xs text-slate-500 block">Autores</span>
-                      <span className="text-2xl font-bold text-slate-900 mt-1 block">96</span>
-                    </div>
-                  </div>
-
-                  {/* Tabla del directorio de usuarios */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4">
-                      <div className="relative flex-1 max-w-sm">
-                        <input
-                          type="text"
-                          placeholder="Búsqueda por nombre o correo..."
-                          className="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600"
-                        />
-                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                      <span className="text-xs text-slate-500">Todos los roles</span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-slate-50 text-slate-400 font-semibold border-b border-slate-100">
-                          <tr>
-                            <th className="py-3 px-4">Nombre Completo</th>
-                            <th className="py-3 px-4">Correo electrónico</th>
-                            <th className="py-3 px-4">Rol</th>
-                            <th className="py-3 px-4">Fecha de registro</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700">
-                          <tr>
-                            <td className="py-3 px-4 font-medium text-slate-900">Sarah Chen</td>
-                            <td className="py-3 px-4 text-slate-500">sarah.chen@correounivalle.edu.co</td>
-                            <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700">
-                                Administrador
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-400">Oct 12, 2026</td>
-                          </tr>
-                          <tr>
-                            <td className="py-3 px-4 font-medium text-slate-900">James Wilson</td>
-                            <td className="py-3 px-4 text-slate-500">j.wilson@univalle.edu.co</td>
-                            <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700">
-                                Comité Científico
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-400">Oct 12, 2026</td>
-                          </tr>
-                          <tr>
-                            <td className="py-3 px-4 font-medium text-slate-900">Amina Hassan</td>
-                            <td className="py-3 px-4 text-slate-500">amina.hassan@univalle.edu.co</td>
-                            <td className="py-3 px-4">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">
-                                Autor
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-400">Oct 13, 2026</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
+                <>
+                  {canManageUsers && <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>}
+                  <UserListView key={lastCreatedUser?.id ?? 'directory'} embedded loadUsers={loadConfiguredUsers} />
+                </>
               )}
             </main>
 

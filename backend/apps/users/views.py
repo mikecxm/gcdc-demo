@@ -5,9 +5,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
-from .models import RoleName
+from .filters import UserFilter
+from .models import CustomUser, RoleName
+from .pagination import UserPagination
 from .permissions import IsAdminOrCommittee
-from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserCreateSerializer, UserListSerializer
 from .services.recaptcha import validate_recaptcha
 from .services.login_audit import is_locked_out, record_attempt
 import re
@@ -23,6 +25,19 @@ from .services.password_recovery import (
     reset_user_password,
     validate_new_password,
 )
+
+
+class UserListView(generics.ListAPIView):
+    serializer_class = UserListSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_class = UserFilter
+    pagination_class = UserPagination
+    queryset = (
+        CustomUser.objects.filter(deleted_at__isnull=True)
+        .only("id", "email", "full_name", "affiliation", "is_active", "created_at")
+        .prefetch_related("roles")
+        .order_by("id")
+    )
 
 
 class UserRegisterView(generics.CreateAPIView):

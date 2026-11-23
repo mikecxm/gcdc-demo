@@ -23,9 +23,11 @@ export interface UserResponse {
   roles: UserRole[];
   is_active: boolean;
   created_at: string;
+  bio?: string | null;
+  updated_at?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1').replace(/\/+$/, '');
 type RetriableRequestConfig = InternalAxiosRequestConfig & { _authRetry?: boolean };
 
 export const apiClient = axios.create({
@@ -36,6 +38,10 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.setContentType(false);
+  }
+
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
