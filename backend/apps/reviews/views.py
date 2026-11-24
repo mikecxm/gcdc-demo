@@ -55,9 +55,14 @@ class AssignReviewersView(APIView):
                 return Response(
                     {
                         "detail": (
+<<<<<<< HEAD
                             f"Este artículo ya tiene {existing_count} jurados asignados."
                             if existing_count > 1
                             else f"Este artículo ya tiene {existing_count} jurado asignado."
+=======
+                            "La asignación debe realizarse de una sola vez: "
+                            f"el artículo ya tiene {existing_count} jurado(s)."
+>>>>>>> 2b7caacb1355086a50d2ecec497f212a02aec024
                         )
                     },
                     status=status.HTTP_400_BAD_REQUEST,
