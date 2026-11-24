@@ -6,8 +6,10 @@ import { getArticleApiErrorMessage, getArticleById, getArticlePdf } from '../../
 import PdfViewer from './PdfViewer';
 import { PdfVersionManager } from './PdfVersionManager';
 import { DisableArticleModal } from './DisableArticleModal';
+import { ArticleMetadataEditForm } from './ArticleMetadataEditForm';
 import {
   X,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Calendar,
@@ -26,6 +28,7 @@ interface ArticleDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onArticleDisabled?: (articleId: number, reason: string) => void;
+  onArticleUpdated?: (article: Article) => void;
 }
 
 export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
@@ -33,6 +36,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   isOpen,
   onClose,
   onArticleDisabled,
+  onArticleUpdated,
 }) => {
   const { session } = useAuth();
   const role = session?.activeRole;
@@ -44,6 +48,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
   } | null>(null);
   const [detailAttempt, setDetailAttempt] = useState(0);
   const [localVersions, setLocalVersions] = useState<ArticleVersion[]>([]);
+  const [metadataSuccessToast, setMetadataSuccessToast] = useState<string | null>(null);
   const selectedArticleId = selectedArticle?.id;
   const article =
     fetchedArticle?.id === selectedArticle?.id ? fetchedArticle : selectedArticle;
@@ -54,10 +59,38 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
       ? detailError.message
       : null;
   const [isDisableModalOpen, setIsDisableModalOpen] = useState(false);
+  const [isMetadataEditing, setIsMetadataEditing] = useState(false);
+
+  let currentUserId: number | null = null;
+  if (session?.accessToken) {
+    try {
+      const payload = JSON.parse(
+        atob(session.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+      ) as { user_id?: unknown };
+      const userId = payload.user_id;
+      if (typeof userId === 'number') {
+        currentUserId = Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+      } else if (typeof userId === 'string' && /^\d+$/.test(userId)) {
+        const parsedUserId = Number(userId);
+        currentUserId = Number.isSafeInteger(parsedUserId) && parsedUserId > 0
+          ? parsedUserId
+          : null;
+      }
+    } catch {
+      currentUserId = null;
+    }
+  }
 
   useEffect(() => {
     setLocalVersions([]);
+    setIsMetadataEditing(false);
   }, [selectedArticleId]);
+
+  useEffect(() => {
+    if (!metadataSuccessToast) return;
+    const timer = window.setTimeout(() => setMetadataSuccessToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [metadataSuccessToast]);
 
   useEffect(() => {
     if (!isOpen || selectedArticleId === undefined) return;
@@ -243,6 +276,25 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
               </div>
             )}
 
+            {isMetadataEditing ? (
+              <section aria-labelledby="metadata-edit-heading" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 id="metadata-edit-heading" className="mb-3 text-sm font-bold text-slate-900">
+                  Editar metadatos
+                </h3>
+                <ArticleMetadataEditForm
+                  article={article}
+                  isOwner={role === 'AUTOR' && currentUserId === article.responsible_author.id}
+                  onCancel={() => setIsMetadataEditing(false)}
+                  onUpdated={(updated) => {
+                    setFetchedArticle(updated);
+                    onArticleUpdated?.(updated);
+                    setMetadataSuccessToast('Los metadatos del artículo se actualizaron correctamente.');
+                    setIsMetadataEditing(false);
+                  }}
+                />
+              </section>
+            ) : null}
+
             {/* Metadatos Rápidos: Fecha y Autor */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
               <div className="flex items-center gap-3">
@@ -411,6 +463,15 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
         {/* Footer del Modal */}
         <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
+            {role === 'AUTOR' && currentUserId === article.responsible_author.id && !isMetadataEditing && (
+              <button
+                type="button"
+                onClick={() => setIsMetadataEditing(true)}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
+              >
+                Editar metadatos
+              </button>
+            )}
             {/* Botón visible para COMITE y ADMIN cuando el artículo está activo */}
             {canDisable && (
               <button
@@ -457,6 +518,24 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
         </div>
       </div>
     </div>
+
+    {metadataSuccessToast && (
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed top-5 right-5 z-[9999] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 shadow-xl"
+      >
+        <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+        <p className="flex-1 text-xs">{metadataSuccessToast}</p>
+        <button
+          type="button"
+          aria-label="Cerrar notificación"
+          onClick={() => setMetadataSuccessToast(null)}
+        >
+          ×
+        </button>
+      </div>
+    )}
 
     {/* Modal de Advertencia Crítica para Deshabilitación */}
     {canDisable && (

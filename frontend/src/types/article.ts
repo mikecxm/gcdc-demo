@@ -40,6 +40,7 @@ export interface Article {
   abstract: string;
   keywords: string;
   thematic_line: string;
+  thematic_line_id?: number;
   responsible_author: ResponsibleAuthor;
   status: ArticleStatus;
   is_enabled: boolean;

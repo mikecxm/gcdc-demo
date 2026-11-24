@@ -7,6 +7,13 @@ export interface ThematicLine {
   name: string;
 }
 
+export interface UpdateArticleMetadataPayload {
+  title: string;
+  abstract: string;
+  keywords: string;
+  thematic_line_id: number;
+}
+
 export const ARTICLE_STATUSES: { value: ArticleStatus; label: string }[] = [
   { value: 'POSTULADO', label: 'Postulado' },
   { value: 'EN_REVISION', label: 'En revisión' },
@@ -385,6 +392,15 @@ export const getArticles = async (
  */
 export const getArticleById = async (id: number, signal?: AbortSignal): Promise<Article> => {
   const response = await apiClient.get<Article>(`/articles/${id}/`, { signal });
+  return response.data;
+};
+
+/** Actualiza los metadatos editables de un artículo mediante GCDC-149. */
+export const updateArticleMetadata = async (
+  id: number,
+  payload: UpdateArticleMetadataPayload
+): Promise<Article> => {
+  const response = await apiClient.patch<Article>(`/articles/${id}/`, payload);
   return response.data;
 };
 
