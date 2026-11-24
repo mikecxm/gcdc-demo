@@ -15,20 +15,20 @@ import {
 import type { Article, CommitteeMember } from '../../types/article';
 import { useAuth } from '../../context/SessionContext';
 
-const normalizeName = (value: string): string =>
-  value
+const normalizeName = (value?: string): string =>
+  (value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
-const normalizeEmail = (value: string): string => value.trim().toLowerCase();
+const normalizeEmail = (value?: string): string => (value ?? '').trim().toLowerCase();
 
 const hasConflictOfInterest = (member: CommitteeMember, article: Article): boolean => {
   const authors = [
     article.responsible_author,
     ...(article.coauthors ?? []),
-  ];
+  ].filter(Boolean);
   const authorIds = new Set(authors.map((author) => author.id).filter((id) => id != null));
   const authorEmails = new Set(
     authors.map((author) => normalizeEmail(author.email)).filter(Boolean)
@@ -123,15 +123,15 @@ export const ReviewerAssignmentPanel: React.FC = () => {
     return committeeMembers
       .filter((member) => !hasConflictOfInterest(member, selectedArticle))
       .sort((first, second) => {
-        const firstAffinity = first.thematic_lines.includes(selectedArticle.thematic_line);
-        const secondAffinity = second.thematic_lines.includes(selectedArticle.thematic_line);
+        const firstAffinity = Boolean(first.thematic_lines?.includes(selectedArticle.thematic_line));
+        const secondAffinity = Boolean(second.thematic_lines?.includes(selectedArticle.thematic_line));
         if (firstAffinity !== secondAffinity) return firstAffinity ? -1 : 1;
         const firstWorkload =
-          first.assigned_article_count + (workloadAdjustments[first.id] ?? 0);
+          (first.assigned_article_count ?? 0) + (workloadAdjustments[first.id] ?? 0);
         const secondWorkload =
-          second.assigned_article_count + (workloadAdjustments[second.id] ?? 0);
+          (second.assigned_article_count ?? 0) + (workloadAdjustments[second.id] ?? 0);
         if (firstWorkload !== secondWorkload) return firstWorkload - secondWorkload;
-        return first.full_name.localeCompare(second.full_name, 'es');
+        return (first.full_name ?? '').localeCompare(second.full_name ?? '', 'es');
       });
   }, [committeeMembers, selectedArticle, workloadAdjustments]);
 
