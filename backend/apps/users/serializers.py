@@ -58,6 +58,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         cleaned = value.strip()
         if not cleaned:
             raise serializers.ValidationError("El nombre completo no puede estar vacío.")
+        if "<" in cleaned or ">" in cleaned:
+            raise serializers.ValidationError(
+                "El nombre completo no puede contener los caracteres < o >."
+            )
         return cleaned
 
     def validate_affiliation(self, value):
@@ -136,6 +140,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         cleaned = value.strip()
         if not cleaned:
             raise serializers.ValidationError("El nombre completo no puede estar vacío.")
+        if "<" in cleaned or ">" in cleaned:
+            raise serializers.ValidationError(
+                "El nombre completo no puede contener los caracteres < o >."
+            )
         return cleaned
 
     def validate_affiliation(self, value):
