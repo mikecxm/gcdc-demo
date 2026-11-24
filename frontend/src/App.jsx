@@ -62,7 +62,7 @@ function App() {
     if (hash === '#usuarios' || path.includes('/usuarios') || path.includes('/users')) {
       return 'usuarios';
     }
-    if (hash === '#jurados' && canAccessReviewerAssignment) {
+    if (hash === '#jurados') {
       return 'jurados';
     }
     return 'articulos'; // Pestaña de artículos por defecto
@@ -83,7 +83,7 @@ function App() {
       } else if (hash === '#usuarios') {
         setCurrentView('workspace');
         setWorkspaceTab('usuarios');
-      } else if (hash === '#jurados' && canAccessReviewerAssignment) {
+      } else if (hash === '#jurados') {
         setCurrentView('workspace');
         setWorkspaceTab('jurados');
       } else if (hash === '#registro' || hash === '#public') {
@@ -506,8 +506,8 @@ function App() {
                   </>
               )}
 
-              {canAccessReviewerAssignment && (
-                <div className={workspaceTab === 'jurados' ? 'block min-w-0' : 'hidden'}>
+              {workspaceTab === 'jurados' && (
+                <div className="block min-w-0">
                   <ReviewerAssignmentPanel />
                 </div>
               )}
