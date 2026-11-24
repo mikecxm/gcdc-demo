@@ -37,6 +37,9 @@ function App() {
     if (hash === '#usuarios' || path.includes('/usuarios') || path.includes('/users')) {
       return 'usuarios';
     }
+    if (hash === '#jurados' && canAccessReviewerAssignment) {
+      return 'jurados';
+    }
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
@@ -55,6 +58,9 @@ function App() {
       } else if (hash === '#usuarios') {
         setCurrentView('workspace');
         setWorkspaceTab('usuarios');
+      } else if (hash === '#jurados' && canAccessReviewerAssignment) {
+        setCurrentView('workspace');
+        setWorkspaceTab('jurados');
       } else if (hash === '#registro' || hash === '#public') {
         setCurrentView('public');
       }
@@ -62,7 +68,7 @@ function App() {
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [canAccessReviewerAssignment]);
 
   const navigateTo = (view, tab) => {
     setIsSubmissionOpen(false);
@@ -436,7 +442,9 @@ function App() {
                   <span className="text-slate-800 font-medium">
                     {workspaceTab === 'articulos'
                       ? 'Catálogo de Artículos'
-                      : 'Directorio de Usuarios'}
+                      : workspaceTab === 'usuarios'
+                      ? 'Directorio de Usuarios'
+                      : 'Asignación de Jurados'}
                   </span>
                 </div>
               </div>
@@ -466,6 +474,12 @@ function App() {
                     {role === 'AUTOR' && <div className="flex justify-end"><button type="button" onClick={() => setIsSubmissionOpen(true)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Postular artículo</button></div>}
                     <ArticleCatalogView />
                   </>
+              )}
+
+              {canAccessReviewerAssignment && (
+                <div className={workspaceTab === 'jurados' ? 'block min-w-0' : 'hidden'}>
+                  <ReviewerAssignmentPanel />
+                </div>
               )}
 
               {workspaceTab === 'usuarios' && (

@@ -1,11 +1,14 @@
+from django.contrib.auth import get_user_model
 from django.contrib import admin
 
 from .models import (
     Article,
     ArticleMetadataAudit,
+    ArticleReviewer,
     ArticleVersion,
     CoAuthor,
     Conference,
+    Evaluation,
     ThematicLine,
 )
 
@@ -65,3 +68,15 @@ class ArticleMetadataAuditAdmin(admin.ModelAdmin):
     list_filter = ("field_name", "modified_at")
     search_fields = ("article__title", "old_value", "new_value")
     readonly_fields = ("article", "field_name", "old_value", "new_value", "modified_at")
+
+
+@admin.register(ArticleReviewer)
+class ArticleReviewerAdmin(admin.ModelAdmin):
+    list_display = ("article", "reviewer", "assigned_at")
+    list_filter = ("reviewer",)
+
+
+@admin.register(Evaluation)
+class EvaluationAdmin(admin.ModelAdmin):
+    list_display = ("assignment", "version", "decision", "evaluated_at")
+    list_filter = ("decision",)

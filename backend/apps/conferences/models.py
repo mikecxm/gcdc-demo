@@ -321,3 +321,9 @@ class Evaluation(models.Model):
 
     def __str__(self):
         return f"{self.assignment} - {self.decision}"
+
+
+# Alias de compatibilidad hacia atrás
+JuryAssignment = ArticleReviewer
+JuryEvaluation = Evaluation
+Verdict = Decision
