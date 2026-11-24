@@ -5,7 +5,7 @@
   "samples": [
     {
       "bytes": 1024,
-      "upload_ms": 20.69849999861617,
+      "upload_ms": 39.852699999755714,
       "upload_status": 201,
       "download_status": 200,
       "source_md5": "142d71a2c2b9b67933549ed7eaccef39",
@@ -15,7 +15,7 @@
     },
     {
       "bytes": 9900000,
-      "upload_ms": 66.56520000069577,
+      "upload_ms": 82.37500000177533,
       "upload_status": 201,
       "download_status": 200,
       "source_md5": "4ababe6442ada9b127b92ae109cad09b",
@@ -25,7 +25,7 @@
     },
     {
       "bytes": 10380902,
-      "upload_ms": 63.875100000586826,
+      "upload_ms": 83.00290000261157,
       "upload_status": 201,
       "download_status": 200,
       "source_md5": "6ef0b27da48ec4621fc07ba453aa84b0",
@@ -35,7 +35,7 @@
     },
     {
       "bytes": 10485760,
-      "upload_ms": 69.7546000010334,
+      "upload_ms": 80.30760000110604,
       "upload_status": 201,
       "download_status": 200,
       "source_md5": "105d3be56fb9b6081374f9419b3ff19a",
