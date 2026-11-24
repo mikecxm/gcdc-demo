@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useRef, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Mail, ShieldCheck, LockKeyhole } from 'lucide-react';
@@ -47,6 +47,7 @@ export const PasswordRecoveryWizard: React.FC<PasswordRecoveryWizardProps> = ({
     const [globalError, setGlobalError] = useState('');
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
+    const pinInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
     const emailForm = useForm<EmailData>({
     resolver: zodResolver(emailSchema),
@@ -235,20 +236,80 @@ return (
         )}
 
         <div>
-            <label htmlFor="recovery-pin" className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label id="recovery-pin-label" htmlFor="recovery-pin-0" className="block text-xs font-medium text-slate-700 mb-1.5">
             PIN de 6 dígitos
             </label>
-            <input
-            id="recovery-pin"
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="000000"
-            {...recoveryForm.register('pin')}
-            className={inputClass}
+            <Controller
+            name="pin"
+            control={recoveryForm.control}
+            render={({ field }) => (
+                <div role="group" aria-labelledby="recovery-pin-label" className="flex items-center justify-between sm:justify-start gap-2">
+                {Array.from({ length: 6 }, (_, index) => {
+                    const value = field.value ?? '';
+                    const digit = value[index] ?? '';
+
+                    return (
+                    <input
+                        key={index}
+                        id={`recovery-pin-${index}`}
+                        ref={(element) => {
+                            pinInputRefs.current[index] = element;
+                            if (index === 0) field.ref(element);
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                        maxLength={index === 0 ? 6 : 1}
+                        value={digit}
+                        aria-label={`Dígito ${index + 1} del PIN`}
+                        aria-invalid={Boolean(recoveryForm.formState.errors.pin)}
+                        aria-describedby={recoveryForm.formState.errors.pin ? 'recovery-pin-error' : undefined}
+                        onBlur={field.onBlur}
+                        onChange={(event) => {
+                            const entered = event.currentTarget.value.replace(/\D/g, '');
+                            if (entered.length > 1) {
+                                const nextPin = `${value.slice(0, index)}${entered}`.slice(0, 6);
+                                field.onChange(nextPin);
+                                pinInputRefs.current[Math.min(nextPin.length, 5)]?.focus();
+                                return;
+                            }
+
+                            const nextPin = `${value.slice(0, index)}${entered}${value.slice(index + 1)}`.slice(0, 6);
+                            field.onChange(nextPin);
+                            if (entered && index < 5) pinInputRefs.current[index + 1]?.focus();
+                        }}
+                        onPaste={(event) => {
+                            event.preventDefault();
+                            const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6 - index);
+                            if (!pasted) return;
+
+                            const nextPin = `${value.slice(0, index)}${pasted}`.slice(0, 6);
+                            field.onChange(nextPin);
+                            pinInputRefs.current[Math.min(index + pasted.length, 5)]?.focus();
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Backspace' && !digit && index > 0) {
+                                const previousIndex = Math.min(index - 1, value.length - 1);
+                                if (previousIndex >= 0) {
+                                    event.preventDefault();
+                                    field.onChange(`${value.slice(0, previousIndex)}${value.slice(previousIndex + 1)}`);
+                                    pinInputRefs.current[previousIndex]?.focus();
+                                }
+                            } else if (event.key === 'ArrowLeft' && index > 0) {
+                                pinInputRefs.current[index - 1]?.focus();
+                            } else if (event.key === 'ArrowRight' && index < 5) {
+                                pinInputRefs.current[index + 1]?.focus();
+                            }
+                        }}
+                        className="w-8 h-8 sm:w-11 sm:h-11 text-center text-lg font-semibold bg-white border border-slate-200 rounded-lg text-slate-900 outline-none transition-all focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15"
+                    />
+                    );
+                })}
+                </div>
+            )}
             />
             {recoveryForm.formState.errors.pin && (
-            <p className="text-red-600 text-xs mt-1">{recoveryForm.formState.errors.pin.message}</p>
+            <p id="recovery-pin-error" className="text-red-600 text-xs mt-1">{recoveryForm.formState.errors.pin.message}</p>
             )}
         </div>
 
