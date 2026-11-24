@@ -2,17 +2,16 @@
 .user-directory {
   position: relative;
   isolation: isolate;
-  height: 100vh;
-  height: 100dvh;
+  min-height: 100dvh;
   max-width: 1600px;
   margin: 0 auto;
   padding: 24px clamp(16px, 3vw, 48px) 20px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  overflow: hidden;
+  overflow: visible;
   color: #334155;
-  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  font-family: inherit;
 }
 .user-directory::before {
   content: '';
@@ -25,7 +24,8 @@
     radial-gradient(circle 190px at -110px 42%, #19265209 99%, transparent 100%),
     radial-gradient(circle 220px at 102% 104%, #dce5ee60 99%, transparent 100%);
 }
-.user-directory--embedded { height: 100%; max-width: none; padding: 20px 24px 16px; }
+.user-directory--embedded { min-height: 0; max-width: none; padding: 0; --directory-top: 56px; }
+.user-directory--embedded::before { display: none; }
 .user-directory > :not(.directory-workspace):not(dialog) { flex-shrink: 0; }
 .directory-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .directory-header h1 { font-size: clamp(24px, 2.5vw, 30px); line-height: 1.25; font-weight: 600; letter-spacing: -.035em; color: #172033; }
@@ -43,7 +43,10 @@
 .directory-stat > div { display: flex; flex-direction: column; gap: 3px; }
 .directory-stat div > span { font-size: 12px; color: #64748b; line-height: 1.4; }
 .directory-stat strong { font-size: 25px; line-height: 1.15; font-weight: 600; color: #1e293b; font-variant-numeric: tabular-nums; }
-.directory-workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; background: white; border: 1px solid #e2e8f0; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 32px #0f172a05; }
+.directory-workspace { display: flex; flex-direction: column; background: white; border: 1px solid #e2e8f0; border-radius: 18px; overflow: visible; box-shadow: 0 4px 20px #0f172a03; }
+.directory-controls { position: sticky; top: var(--directory-top, 0px); z-index: 20; background: white; border-radius: 18px 18px 0 0; box-shadow: 0 1px 0 #e2e8f0; }
+.directory-controls > div:last-child { padding: 0 24px 12px; }
+.directory-controls > div:last-child > p { font-size: 12px; color: #64748b; }
 .directory-workspace > :not(.directory-list) { flex-shrink: 0; }
 .directory-workspace > [role='status'] { margin: 12px 24px 0; }
 .directory-toolbar { padding: 18px 24px 12px; }
@@ -54,26 +57,26 @@
 .directory-toolbar select { background-color: white; }
 .directory-toolbar input:focus, .directory-toolbar select:focus { border-color: #818cf8; }
 .directory-list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.directory-list > div:first-child, .directory-list > footer { flex-shrink: 0; }
-.directory-list > div:first-child { padding: 0 24px 12px; border: 0; }
-.directory-list > div:first-child > p { font-size: 13px; color: #64748b; }
+.directory-list > footer { flex-shrink: 0; }
+
+
 .directory-sort { display: flex; align-items: center; gap: 6px; color: #64748b; }
 .directory-sort select { padding: 4px; color: #475569; background: transparent; font-size: 12px; max-width: 190px; }
-.directory-table-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.directory-table-scroll { overflow: visible; }
 .directory-table-scroll:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }
 .directory-skeleton { display: block; height: 16px; width: 75%; border-radius: 6px; background: #e9edf5; animation: directory-pulse 1.2s ease-in-out infinite; }
 .directory-skeleton-row td { height: 85px; }
 .directory-skeleton-row td:first-child .directory-skeleton { height: 38px; }
 @keyframes directory-pulse { 50% { opacity: .4; } }
 @media (prefers-reduced-motion: reduce) { .directory-skeleton { animation: none; } }
-.directory-list table { table-layout: fixed; border-collapse: separate; border-spacing: 0; min-width: 980px; }
-.directory-list thead th { position: sticky; top: 0; z-index: 1; background: #f8fafc; border-top: 1px solid #e8edf3; border-bottom: 1px solid #e8edf3; font-size: 13px; font-weight: 500; color: #475569; padding-top: 14px; padding-bottom: 14px; }
+.directory-list table { table-layout: fixed; border-collapse: separate; border-spacing: 0; min-width: 0; }
+.directory-list thead th { position: sticky; top: calc(var(--directory-top, 0px) + var(--directory-controls-height, 110px)); z-index: 10; background: #f8fafc; border-top: 1px solid #e8edf3; border-bottom: 1px solid #e8edf3; font-size: 12px; font-weight: 600; color: #475569; padding-top: 14px; padding-bottom: 14px; }
 .directory-list th:first-child { width: 32%; }
 .directory-list th:nth-child(2) { width: 24%; }
 .directory-list th:nth-child(3) { width: 17%; }
 .directory-list th:nth-child(4) { width: 11%; }
 .directory-list th:last-child { width: 16%; }
-.directory-list td { padding-top: 17px; padding-bottom: 17px; border-bottom: 1px solid #edf1f5; vertical-align: middle; }
+.directory-list td { padding-top: 16px; padding-bottom: 16px; border-bottom: 1px solid #edf1f5; vertical-align: middle; }
 .directory-list tbody tr:last-child td { border-bottom: 0; }
 .directory-list td:first-child, .directory-list th:first-child { padding-left: 24px; }
 .directory-list td:last-child, .directory-list th:last-child { padding-right: 24px; }
@@ -142,10 +145,66 @@
   .directory-stat strong { font-size: 23px; }
   .directory-toolbar { padding-top: 12px; }
 }
-/* Allow document scrolling only when zoom or landscape leaves too little room. */
-@media (max-height: 480px) {
-  .user-directory { height: auto; min-height: 100dvh; overflow: visible; }
-  .directory-workspace, .directory-list { flex: none; }
-  .directory-table-scroll { flex: none; height: 50dvh; min-height: 180px; }
-  .user-directory--embedded { height: 100%; min-height: 0; overflow: auto; }
+
+.directory-list footer { border-radius: 0 0 18px 18px; }
+.directory-list td:last-child button:disabled { display: none; }
+@media (max-width: 1100px) {
+  .directory-table-scroll { overflow-x: auto; }
+  .directory-list table { min-width: 860px; }
+  .directory-list thead th { position: static; }
+}
+@media (max-width: 640px) {
+  .user-directory--embedded { padding: 0; }
+  .directory-header { flex-wrap: wrap; }
+  .directory-header > button { font-size: 12px; padding: 9px 12px; }
+  .directory-controls > div:last-child { padding: 0 14px 10px; gap: 6px; flex-wrap: wrap; }
+  .directory-controls > div:last-child > p { font-size: 11px; }
+}
+
+/* The frame stays in the viewport; only its rows scroll. */
+.user-directory { height: 100dvh; min-height: 0; overflow: hidden; gap: 0; }
+.user-directory--embedded { height: 100%; flex: 1; min-height: 0; padding: 0; }
+.directory-overview { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 340ms cubic-bezier(.22,1,.36,1), opacity 220ms ease; }
+.directory-overview-inner { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 18px; padding-bottom: 18px; transform: translateY(0); transition: padding-bottom 340ms cubic-bezier(.22,1,.36,1), transform 380ms cubic-bezier(.22,1,.36,1); }
+.directory-overview .directory-stat { transform: translateY(0) scale(1); opacity: 1; transition: transform 380ms cubic-bezier(.22,1,.36,1), opacity 200ms ease; }
+.directory-overview .directory-stat:nth-child(2) { transition-delay: 20ms; }
+.directory-overview .directory-stat:nth-child(3) { transition-delay: 35ms; }
+.directory-overview .directory-stat:nth-child(4) { transition-delay: 50ms; }
+.user-directory--compact .directory-overview { grid-template-rows: 0fr; opacity: 0; pointer-events: none; transition-duration: 300ms, 160ms; }
+.user-directory--compact .directory-overview-inner { transform: translateY(-5px); }
+.user-directory--compact .directory-stat { transform: translateY(-6px) scale(.995); opacity: 0; transition-duration: 200ms; transition-delay: 0ms; transition-timing-function: ease; }
+.user-directory--compact .directory-overview-inner { padding-bottom: 0; }
+.directory-compact-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; height: 0; opacity: 0; overflow: hidden; transition: height 340ms cubic-bezier(.22,1,.36,1), opacity 180ms ease; }
+.directory-compact-heading > * { transform: translateY(-6px); transition: transform 360ms cubic-bezier(.22,1,.36,1); }
+.user-directory--compact .directory-compact-heading > * { transform: translateY(0); }
+.user-directory--compact .directory-compact-heading { height: 42px; opacity: 1; }
+.directory-compact-heading > span { font-size: 15px; font-weight: 600; color: #172033; }
+.directory-compact-heading button { font-size: 12px; color: #4f46e5; padding: 6px; border-radius: 6px; }
+.directory-workspace { flex: 1; min-height: 0; overflow: hidden; }
+.directory-controls { position: relative; top: auto; flex-shrink: 0; }
+.directory-list { flex: 1; min-height: 0; }
+.directory-table-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 !important; }
+.directory-list thead th { position: sticky; top: 0; z-index: 2; }
+.directory-list footer { flex-shrink: 0; }
+.directory-header-actions { display: flex; align-items: center; gap: 12px; }
+.directory-motion-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; padding: 7px 9px; color: #64748b; font-size: 11px; white-space: nowrap; }
+.directory-motion-control:hover { background: #f8fafc; }
+.directory-motion-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+.directory-motion-control[aria-pressed='true'] .directory-motion-dot { background: #6366f1; }
+.user-directory--motion-off .directory-overview,
+.user-directory--motion-off .directory-overview-inner,
+.user-directory--motion-off .directory-stat,
+.user-directory--motion-off .directory-compact-heading,
+.user-directory--motion-off .directory-compact-heading > * { transition: none; animation: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  /* This directory has an explicit local motion control. Other views follow the OS. */
+  .user-directory:not(.user-directory--motion-on) .directory-overview,
+  .user-directory:not(.user-directory--motion-on) .directory-overview-inner,
+  .user-directory:not(.user-directory--motion-on) .directory-stat,
+  .user-directory:not(.user-directory--motion-on) .directory-compact-heading,
+  .user-directory:not(.user-directory--motion-on) .directory-compact-heading > * { transition: none; transform: none; }
+}
+@media (max-height: 600px) {
+  .directory-summary { display: none; }
+  .directory-overview-inner { gap: 10px; padding-bottom: 12px; }
 }
