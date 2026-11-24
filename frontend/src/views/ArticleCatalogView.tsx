@@ -495,6 +495,12 @@ export const ArticleCatalogView: React.FC = () => {
         isOpen={isModalOpen}
         onClose={handleCloseDetail}
         onArticleDisabled={handleArticleDisabled}
+        onArticleUpdated={(updated) => {
+          setAllArticles((articles) =>
+            articles.map((item) => item.id === updated.id ? updated : item)
+          );
+          setSelectedArticle(updated);
+        }}
       />
     </div>
   );
