@@ -1,3 +1,8 @@
+import { UserDeactivationDialog } from './components/users/UserDeactivationDialog';
+import { UserRound } from 'lucide-react';
+import { UserProfileForm } from './components/users/UserProfileForm';
+import { apiClient } from './services/api';
+import { ReviewerAssignmentPanel } from './components/articles/ReviewerAssignmentPanel';
 import { useState, useEffect } from 'react';
 import { UserListView } from './components/users/UserListView';
 import { loadConfiguredUsers } from './services/usersApi';
@@ -11,7 +16,27 @@ const LIBRARY_BG_URL =
   'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1600&auto=format&fit=crop';
 
 function App() {
-  const { session, logout } = useAuth();
+  const { session, logout, startSession } = useAuth();
+  const canAccessReviewerAssignment = session?.activeRole === "ADMIN" || session?.activeRole === "COMITE";
+  const [deactivationTarget, setDeactivationTarget] = useState(null);
+  const [profileTarget, setProfileTarget] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [profileNotice, setProfileNotice] = useState(null);
+  const [directoryVersion, setDirectoryVersion] = useState(0);
+  let currentUserId = null;
+  try { currentUserId = Number(JSON.parse(atob(session.accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).user_id); } catch { /* No authenticated session. */ }
+  const notifyProfile = (message, error = false) => setProfileNotice({ message, error });
+  useEffect(() => { if (!profileNotice) return; const timer = setTimeout(() => setProfileNotice(null), 7000); return () => clearTimeout(timer); }, [profileNotice]);
+  const openMyProfile = async () => {
+    if (!currentUserId || isProfileLoading) return;
+    setIsProfileLoading(true);
+    try {
+      const { data } = await apiClient.get(`/users/${currentUserId}/`);
+      setIsMobileMenuOpen(false);
+      setProfileTarget(data);
+    } catch { notifyProfile("No pudimos cargar tu perfil.", true); }
+    finally { setIsProfileLoading(false); }
+  };
   const navigate = useNavigate();
   const user = session ? { full_name: session.fullName } : null;
   const role = session?.activeRole;
@@ -37,6 +62,9 @@ function App() {
     if (hash === '#usuarios' || path.includes('/usuarios') || path.includes('/users')) {
       return 'usuarios';
     }
+    if (hash === '#jurados' && canAccessReviewerAssignment) {
+      return 'jurados';
+    }
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
@@ -55,6 +83,9 @@ function App() {
       } else if (hash === '#usuarios') {
         setCurrentView('workspace');
         setWorkspaceTab('usuarios');
+      } else if (hash === '#jurados' && canAccessReviewerAssignment) {
+        setCurrentView('workspace');
+        setWorkspaceTab('jurados');
       } else if (hash === '#registro' || hash === '#public') {
         setCurrentView('public');
       }
@@ -62,7 +93,7 @@ function App() {
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [canAccessReviewerAssignment]);
 
   const navigateTo = (view, tab) => {
     setIsSubmissionOpen(false);
@@ -110,6 +141,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative selection:bg-indigo-100 selection:text-indigo-900">
+      <UserDeactivationDialog targetUser={deactivationTarget} onClose={() => setDeactivationTarget(null)} onDeactivated={() => { setDirectoryVersion(value => value + 1); notifyProfile("Usuario desactivado correctamente"); }} />
+      <UserProfileForm isOpen={Boolean(profileTarget)} targetUser={profileTarget} currentUser={currentUserId ? { id: currentUserId, role: session?.activeRole } : null} onClose={() => setProfileTarget(null)} onNotice={notifyProfile} onSaved={(updated) => { setDirectoryVersion(value => value + 1); if (updated.id === currentUserId) startSession({ ...session, fullName: updated.full_name }); }} />
+      {profileNotice && <div role={profileNotice.error ? 'alert' : 'status'} className={`fixed right-4 top-4 z-[100] max-w-sm rounded-xl border p-4 text-sm shadow-lg ${profileNotice.error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{profileNotice.message}<button type="button" aria-label="Cerrar notificación" onClick={() => setProfileNotice(null)} className="ml-3">×</button></div>}
       {/* ========================================================
           1. VISTA PÚBLICA (SPLIT SCREEN: ARQUITECTURA + PORTAL)
          ======================================================== */}
@@ -263,6 +297,7 @@ function App() {
                 </button>
               </div>
 
+              <button type="button" onClick={openMyProfile} disabled={isProfileLoading} className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-indigo-700 hover:bg-indigo-50">Mi Perfil</button>
               {/* Selector de Conferencia */}
               <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between text-left">
                 <div className="flex items-center gap-2.5">
@@ -414,7 +449,7 @@ function App() {
           </aside>
 
           {/* Área principal de contenido del Espacio de Trabajo */}
-          <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
+          <div data-workspace-surface className={`flex-1 flex flex-col h-full min-w-0 ${workspaceTab === 'usuarios' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
             {/* Topbar del Dashboard */}
             <header className="h-14 border-b border-slate-200 bg-white px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shrink-0">
               <div className="flex items-center gap-3">
@@ -436,15 +471,18 @@ function App() {
                   <span className="text-slate-800 font-medium">
                     {workspaceTab === 'articulos'
                       ? 'Catálogo de Artículos'
-                      : 'Directorio de Usuarios'}
+                      : workspaceTab === 'usuarios'
+                      ? 'Directorio de Usuarios'
+                      : 'Asignación de Jurados'}
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500 font-medium hidden sm:inline">
-                  Symposia 2026
-                </span>
+                <button type="button" onClick={openMyProfile} disabled={isProfileLoading} aria-busy={isProfileLoading} aria-haspopup="dialog" className="inline-flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60 sm:px-3">
+                  <UserRound className="h-4 w-4" aria-hidden="true" />
+                  <span>{isProfileLoading ? 'Cargando?' : 'Mi perfil'}</span>
+                </button>
                 <div className="h-4 w-px bg-slate-200 hidden sm:block" />
                 <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
                   {roleLabel}
@@ -460,7 +498,7 @@ function App() {
             </header>
 
             {/* Contenido dinámico según la pestaña activa */}
-            <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+            <main className={`p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto ${workspaceTab === 'usuarios' ? 'flex flex-1 min-h-0 flex-col' : 'space-y-6'}`}>
               {workspaceTab === 'articulos' && (
                   <>
                     {role === 'AUTOR' && <div className="flex justify-end"><button type="button" onClick={() => setIsSubmissionOpen(true)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Postular artículo</button></div>}
@@ -468,10 +506,16 @@ function App() {
                   </>
               )}
 
+              {canAccessReviewerAssignment && (
+                <div className={workspaceTab === 'jurados' ? 'block min-w-0' : 'hidden'}>
+                  <ReviewerAssignmentPanel />
+                </div>
+              )}
+
               {workspaceTab === 'usuarios' && (
                 <>
-                  {canManageUsers && <button type="button" onClick={() => setIsAdminModalOpen(true)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">Añadir usuario</button>}
-                  <UserListView key={lastCreatedUser?.id ?? 'directory'} embedded loadUsers={loadConfiguredUsers} />
+
+                  <UserListView key={`${lastCreatedUser?.id ?? 'directory'}-${directoryVersion}`} embedded onToggleUserStatus={["ADMIN", "COMITE"].includes(role) ? setDeactivationTarget : undefined} canToggleUserStatus={(target) => ["ADMIN", "COMITE"].includes(role) && target.id !== currentUserId && target.is_active} headerAction={canManageUsers ? <button type="button" onClick={() => setIsAdminModalOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"><span aria-hidden="true">+</span> Añadir usuario</button> : null} loadUsers={loadConfiguredUsers} onEditProfile={(target) => { if (target.id === currentUserId || ["ADMIN", "COMITE"].includes(role)) setProfileTarget(target); }} canEditProfile={(target) => target.is_active && (target.id === currentUserId || ["ADMIN", "COMITE"].includes(role))} />
                 </>
               )}
             </main>

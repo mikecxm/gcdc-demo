@@ -48,6 +48,7 @@ INSTALLED_APPS = [
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
+TEST_RUNNER = 'config.test_runner.IsolatedDatabaseTestRunner'
 
 # Supabase remains the default; local QA can use real files without cloud keys.
 ARTICLE_PDF_STORAGE_BACKEND = config('ARTICLE_PDF_STORAGE_BACKEND', default='supabase')

@@ -58,7 +58,39 @@ variables. `VITE_API_URL` debe apuntar al backend, por defecto `http://127.0.0.1
 `VITE_USERS_LIST_PATH=users/` es la ruta del directorio. Los PDF locales se guardan en
 `backend/media/article-pdfs/` y no se sincronizan entre integrantes.
 
+## Perfiles y desactivación de usuarios
+
+Cada integrante usa sus propios usuarios y su propia base: el frontend obtiene el
+identificador de la sesión y envía las solicitudes a `VITE_API_URL`. No depende de
+las cuentas de prueba creadas en otro computador. Estos cambios no requieren nuevas
+migraciones ni reemplazar los archivos `.env` existentes.
+
+Desde **Mi perfil** se pueden actualizar el nombre y la afiliación. El correo es de
+solo lectura. Un autor solo edita su perfil; administradores y comité pueden editar
+otros usuarios desde el directorio. Solo un administrador puede cambiar el rol de
+otra persona; nadie cambia su propio rol.
+
+La acción **Desactivar usuario** está disponible para administradores y comité,
+excepto sobre su propia cuenta. Usa el endpoint existente `DELETE /api/v1/users/{id}/`:
+es una baja lógica que conserva las asignaciones y evaluaciones previas, incluso
+si el usuario es jurado de un artículo en revisión. No cancela ni reasigna las
+revisiones pendientes. El usuario pierde acceso y sale del directorio; esta pantalla
+no ofrece reactivación ni borrado definitivo.
+
+Para probar con permisos de administrador en una base nueva, crea una cuenta local
+desde `backend` con `.venv/Scripts/python.exe manage.py createsuperuser` y utiliza
+tu propio correo institucional y contraseña. El manager del proyecto asigna `ADMIN`.
+Desde esa sesión puedes crear usuarios autor y comité. Las credenciales y los datos
+de cada integrante permanecen en su base local y no se suben a Git.
+
 ## Validación
+
+Las pruebas de Django usan `config.test_runner.IsolatedDatabaseTestRunner`: cierra
+el pool de desarrollo antes de crear/migrar la base de pruebas, abre un pool nuevo
+solo para esa base y lo cierra antes de volver a la configuración local. También
+rechaza usar la misma base como destino de desarrollo y pruebas. Esta protección
+aplica a `manage.py test` y a los scripts que usan `get_runner(settings)`; no cambies
+`TEST_RUNNER` por el runner predeterminado al ejecutar esas verificaciones.
 
 ```powershell
 # Desde backend (PostgreSQL local configurado; usa una base de pruebas aislada)
