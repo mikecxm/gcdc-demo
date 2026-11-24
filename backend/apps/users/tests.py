@@ -399,6 +399,14 @@ class UserUpdateEndpointTests(APITestCase):
         self.assertFalse(self.author_1.has_role(RoleName.ADMIN))
         self.assertTrue(self.author_1.has_role(RoleName.AUTOR))
 
+    def test_committee_cannot_change_another_users_role(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.patch(url, {"role": RoleName.ADMIN}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.author_1.refresh_from_db()
+        self.assertEqual(list(self.author_1.roles.values_list("name", flat=True)), [RoleName.AUTOR])
+
     def test_email_cannot_be_changed_via_patch(self):
         self.client.force_authenticate(user=self.author_1)
         url = reverse("user-detail", kwargs={"pk": self.author_1.id})
