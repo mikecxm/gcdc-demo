@@ -17,8 +17,10 @@ import {
 } from 'lucide-react';
 import type { UserResponse, UserRole } from '../../services/api';
 import type { UserListLoader } from '../../services/usersApi';
+import { useAuth } from '../../context/SessionContext';
 import { loadDemoUsers } from './userList.mock';
 import { filterUsers, normalizeSearch, paginateUsers } from './userList.logic';
+import { UserDeactivateModal } from './UserDeactivateModal';
 import './UserDirectoryView.css';
 
 const PAGE_SIZE = 10;
@@ -108,10 +110,61 @@ export const UserListView = ({
 	const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 	const [page, setPage] = useState(1);
 	const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
+	const [userToDeactivate, setUserToDeactivate] = useState<UserResponse | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [sortOrder, setSortOrder] = useState<'NAME' | 'NEWEST'>('NAME');
 	const profileDialog = useRef<HTMLDialogElement>(null);
 	const tableScroll = useRef<HTMLDivElement>(null);
+	const { session } = useAuth();
+
+	const currentUserAuth = (() => {
+		if (!session?.accessToken) return { id: null, email: null };
+		try {
+			const parts = session.accessToken.split('.');
+			if (parts.length === 3) {
+				const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+				return {
+					id: typeof payload.user_id === 'number' ? payload.user_id : null,
+					email: typeof payload.email === 'string' ? payload.email.toLowerCase() : null,
+				};
+			}
+		} catch {
+			// ignore
+		}
+		return { id: null, email: null };
+	})();
+
+	const isPrivileged = session?.activeRole === 'ADMIN' || session?.activeRole === 'COMITE';
+	const isAuthor = session?.activeRole === 'AUTOR';
+
+	const isSelf = (targetUser: UserResponse) => Boolean(
+		(currentUserAuth.id !== null && currentUserAuth.id === targetUser.id) ||
+		(currentUserAuth.email !== null && currentUserAuth.email === targetUser.email.toLowerCase()) ||
+		(Boolean(session?.fullName) && session?.fullName === targetUser.full_name)
+	);
+
+	const isDeactivateDisabled = (targetUser: UserResponse) => {
+		if (onToggleUserStatus) return !canToggleUserStatus(targetUser) || isSelf(targetUser);
+		if (isSelf(targetUser)) return true;
+		if (isAuthor) return true;
+		if (!targetUser.is_active) return true;
+		if (isPrivileged || isDemo) return false;
+		return true;
+	};
+
+	const getDeactivateTitle = (targetUser: UserResponse) => {
+		if (isSelf(targetUser)) return 'No puedes desactivar tu propia cuenta';
+		if (isAuthor) return 'Solo administradores o comité pueden desactivar usuarios';
+		if (!targetUser.is_active) return 'Usuario inactivo';
+		return 'Desactivar usuario';
+	};
+
+	const getDeactivateAriaLabel = (targetUser: UserResponse) => {
+		if (isSelf(targetUser)) return `No puedes desactivar tu propia cuenta (${targetUser.full_name})`;
+		if (isAuthor) return `No tienes permisos para desactivar a ${targetUser.full_name}`;
+		return `${targetUser.is_active ? 'Deshabilitar' : 'Activar'} usuario ${targetUser.full_name}`;
+	};
+
 	const directoryRoot = useRef<HTMLElement>(null);
 	const [isCompact, setIsCompact] = useState(false);
 	const compactRef = useRef(false);
@@ -157,7 +210,7 @@ export const UserListView = ({
 		const wheel = (event: WheelEvent) => {
 			const table = tableScroll.current;
 			if (!table || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-			if ((event.target as Element).closest('dialog')) return;
+			if ((event.target as Element).closest('dialog, [role="dialog"]')) return;
 			const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? table.clientHeight : 1);
 			if (Math.abs(delta) < 2) return;
 			event.preventDefault();
@@ -197,7 +250,10 @@ export const UserListView = ({
 			onToggleUserStatus(user);
 			return;
 		}
-		if (!isDemo) return;
+		if (!isDemo || isPrivileged) {
+			setUserToDeactivate(user);
+			return;
+		}
 
 		const nextActiveState = !user.is_active;
 		setUsers((currentUsers) =>
@@ -206,6 +262,13 @@ export const UserListView = ({
 			)
 		);
 		setNotice(`${user.full_name} ${nextActiveState ? 'fue activado' : 'fue deshabilitado'} en los datos de prueba.`);
+	};
+
+	const handleDeactivationSuccess = (deactivatedUser: UserResponse) => {
+		setUserToDeactivate(null);
+		setUsers((currentUsers) => currentUsers.filter((u) => u.id !== deactivatedUser.id));
+		setNotice(`La cuenta de ${deactivatedUser.full_name} (${deactivatedUser.email}) ha sido desactivada correctamente.`);
+		setRequestVersion((version) => version + 1);
 	};
 
 	const handleEditProfile = (user: UserResponse) => {
@@ -375,10 +438,16 @@ export const UserListView = ({
 											<button
 												type="button"
 												onClick={() => handleToggleUserStatus(user)}
-												disabled={!isDemo && (!onToggleUserStatus || !canToggleUserStatus(user))}
-												aria-label={`${user.is_active ? 'Desactivar' : 'Activar'} usuario ${user.full_name}`}
-												title={user.is_active ? 'Desactivar usuario' : 'Activar Usuario'}
-												className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${user.is_active ? 'text-slate-400 hover:bg-rose-50 hover:text-rose-600 focus:ring-rose-500' : 'text-emerald-700 hover:bg-emerald-50 focus:ring-emerald-500'}`}
+												disabled={isDeactivateDisabled(user)}
+												aria-label={getDeactivateAriaLabel(user)}
+												title={getDeactivateTitle(user)}
+												className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+													isDeactivateDisabled(user)
+														? 'cursor-not-allowed opacity-40 text-slate-400'
+														: user.is_active
+															? 'text-slate-500 hover:bg-rose-50 hover:text-rose-600 focus:ring-rose-500'
+															: 'text-emerald-700 hover:bg-emerald-50 focus:ring-emerald-500'
+												}`}
 											>
 												{user.is_active ? <UserX aria-hidden="true" className="h-4 w-4" /> : <UserCheck aria-hidden="true" className="h-4 w-4" />}
 											</button>
@@ -458,6 +527,13 @@ export const UserListView = ({
 					</section>
 			)}
 			</dialog>
+			<UserDeactivateModal
+				key={userToDeactivate?.id ?? 'none'}
+				user={userToDeactivate}
+				isOpen={Boolean(userToDeactivate)}
+				onClose={() => setUserToDeactivate(null)}
+				onSuccess={handleDeactivationSuccess}
+			/>
 		</main>
 	);
 };
