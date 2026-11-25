@@ -29,9 +29,11 @@ export interface CommitteeMember {
   id: number;
   email: string;
   full_name: string;
-  roles: ['COMITE'];
-  thematic_lines: string[];
-  assigned_article_count: number;
+  affiliation: string;
+  /** Number of articles currently assigned to this reviewer (from backend). */
+  current_assignments: number;
+  /** Thematic affinity score for a specific article (only from suggest-reviewers). */
+  thematic_affinity?: number;
 }
 
 export interface Article {

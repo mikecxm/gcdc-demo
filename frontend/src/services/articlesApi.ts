@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { apiClient } from './api';
-import type { Article, ArticleStatus, ArticleVersion } from '../types/article';
+import type { Article, ArticleStatus, ArticleVersion, CommitteeMember } from '../types/article';
 
 export interface ThematicLine {
   id: number;
@@ -212,72 +212,7 @@ export const MOCK_ARTICLES: Article[] = [
   },
 ];
 
-export const MOCK_COMMITTEE_MEMBERS: CommitteeMember[] = [
-  {
-    id: 101,
-    email: 'carlos.mendoza@correounivalle.edu.co',
-    full_name: 'Dr. Carlos Mendoza',
-    roles: ['COMITE'],
-    thematic_lines: ['Inteligencia Artificial'],
-    assigned_article_count: 2,
-  },
-  {
-    id: 11,
-    email: 'mateo.gomez@correounivalle.edu.co',
-    full_name: 'Ing. Mateo Gómez',
-    roles: ['COMITE'],
-    thematic_lines: ['Sistemas Distribuidos'],
-    assigned_article_count: 1,
-  },
-  {
-    id: 12,
-    email: 'sofia.rincon@unal.edu.co',
-    full_name: 'Dra. Sofía Rincón',
-    roles: ['COMITE'],
-    thematic_lines: ['Inteligencia Artificial'],
-    assigned_article_count: 3,
-  },
-  {
-    id: 202,
-    email: 'elena.valencia@correounivalle.edu.co',
-    full_name: 'Dra. Elena Valencia',
-    roles: ['COMITE'],
-    thematic_lines: ['Inteligencia Artificial', 'Ciencia de Datos'],
-    assigned_article_count: 2,
-  },
-  {
-    id: 203,
-    email: 'james.wilson@univalle.edu.co',
-    full_name: 'James Wilson',
-    roles: ['COMITE'],
-    thematic_lines: ['Ciberseguridad'],
-    assigned_article_count: 0,
-  },
-  {
-    id: 204,
-    email: 'ana.martinez@univalle.edu.co',
-    full_name: 'Dra. Ana Martínez',
-    roles: ['COMITE'],
-    thematic_lines: ['Inteligencia Artificial'],
-    assigned_article_count: 4,
-  },
-  {
-    id: 205,
-    email: 'david.ortiz@univalle.edu.co',
-    full_name: 'Dr. David Ortiz',
-    roles: ['COMITE'],
-    thematic_lines: ['Ingeniería de Software'],
-    assigned_article_count: 1,
-  },
-  {
-    id: 206,
-    email: 'lucia.vega@univalle.edu.co',
-    full_name: 'MSc. Lucía Vega',
-    roles: ['COMITE'],
-    thematic_lines: ['Sistemas Distribuidos', 'Ciencia de Datos'],
-    assigned_article_count: 5,
-  },
-];
+export const MOCK_COMMITTEE_MEMBERS: CommitteeMember[] = [];
 
 export interface FetchArticlesResponse {
   data: Article[];
@@ -449,7 +384,6 @@ export interface AssignReviewersResponse {
   article_id: number;
   article_title: string;
   article_status: string;
-  message: string;
   assignments: Array<{
     id: number;
     reviewer_id: number;
@@ -475,34 +409,23 @@ export const assignReviewers = async (
 
 /**
  * Consulta la lista de miembros del comité científico activos desde el backend (HU-12 / GCDC-161).
+ * Endpoint: GET /api/v1/reviews/committee-members/
  */
 export const getCommitteeMembers = async (): Promise<CommitteeMember[]> => {
-  try {
-    const response = await apiClient.get<CommitteeMember[]>('/reviews/committee-members/');
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return response.data;
-    }
-    return MOCK_COMMITTEE_MEMBERS.filter((m) => m.roles.includes('COMITE'));
-  } catch {
-    return MOCK_COMMITTEE_MEMBERS.filter((m) => m.roles.includes('COMITE'));
-  }
+  const response = await apiClient.get<CommitteeMember[]>('/reviews/committee-members/');
+  return Array.isArray(response.data) ? response.data : [];
 };
 
 /**
  * Consulta las sugerencias balanceadas de jurados para un artículo (HU-12 / GCDC-161).
+ * Endpoint: GET /api/v1/reviews/suggest-reviewers/?article_id=...
  */
 export const getReviewerSuggestions = async (
   articleId: number
 ): Promise<CommitteeMember[]> => {
-  try {
-    const response = await apiClient.get<CommitteeMember[]>(
-      `/reviews/suggest-reviewers/?article_id=${articleId}`
-    );
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return response.data;
-    }
-    return [];
-  } catch {
-    return [];
-  }
+  const response = await apiClient.get<CommitteeMember[]>(
+    `/reviews/suggest-reviewers/`,
+    { params: { article_id: articleId } }
+  );
+  return Array.isArray(response.data) ? response.data : [];
 };

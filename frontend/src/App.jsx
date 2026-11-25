@@ -402,6 +402,47 @@ function App() {
                 </div>
               </button>
 
+              {/* Ítem: Asignación de Jurados (HU-12) — solo ADMIN y COMITE */}
+              {canAccessReviewerAssignment && (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('workspace', 'jurados')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                    workspaceTab === 'jurados'
+                      ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <svg
+                      className={`w-4 h-4 ${
+                        workspaceTab === 'jurados' ? 'text-indigo-600' : 'text-slate-400'
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                      />
+                    </svg>
+                    <span>Asignación de Jurados</span>
+                  </div>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                      workspaceTab === 'jurados'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    HU-12
+                  </span>
+                </button>
+              )}
+
               <div className="pt-2">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
                   Otros Módulos

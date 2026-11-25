@@ -54,3 +54,7 @@ class ReviewerSuggestionSerializer(serializers.Serializer):
     current_assignments = serializers.IntegerField(
         help_text="Cantidad actual de artículos asignados como jurado."
     )
+    thematic_affinity = serializers.IntegerField(
+        help_text="Cantidad de artículos ya evaluados en la misma línea temática.",
+        default=0,
+    )
