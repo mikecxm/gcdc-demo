@@ -1,4 +1,4 @@
-import { UserDeactivationDialog } from './components/users/UserDeactivationDialog';
+import { UserDeactivateModal } from './components/users/UserDeactivateModal';
 import { UserRound } from 'lucide-react';
 import { UserProfileForm } from './components/users/UserProfileForm';
 import { apiClient } from './services/api';
@@ -141,7 +141,17 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative selection:bg-indigo-100 selection:text-indigo-900">
-      <UserDeactivationDialog targetUser={deactivationTarget} onClose={() => setDeactivationTarget(null)} onDeactivated={() => { setDirectoryVersion(value => value + 1); notifyProfile("Usuario desactivado correctamente"); }} />
+      <UserDeactivateModal
+        key={deactivationTarget?.id ?? 'none'}
+        user={deactivationTarget}
+        isOpen={Boolean(deactivationTarget)}
+        onClose={() => setDeactivationTarget(null)}
+        onSuccess={() => {
+          setDeactivationTarget(null);
+          setDirectoryVersion((value) => value + 1);
+          notifyProfile('Usuario desactivado correctamente');
+        }}
+      />
       <UserProfileForm isOpen={Boolean(profileTarget)} targetUser={profileTarget} currentUser={currentUserId ? { id: currentUserId, role: session?.activeRole } : null} onClose={() => setProfileTarget(null)} onNotice={notifyProfile} onSaved={(updated) => { setDirectoryVersion(value => value + 1); if (updated.id === currentUserId) startSession({ ...session, fullName: updated.full_name }); }} />
       {profileNotice && <div role={profileNotice.error ? 'alert' : 'status'} className={`fixed right-4 top-4 z-[100] max-w-sm rounded-xl border p-4 text-sm shadow-lg ${profileNotice.error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{profileNotice.message}<button type="button" aria-label="Cerrar notificación" onClick={() => setProfileNotice(null)} className="ml-3">×</button></div>}
       {/* ========================================================
