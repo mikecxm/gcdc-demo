@@ -58,6 +58,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         cleaned = value.strip()
         if not cleaned:
             raise serializers.ValidationError("El nombre completo no puede estar vacío.")
+        if "<" in cleaned or ">" in cleaned:
+            raise serializers.ValidationError(
+                "El nombre completo no puede contener los caracteres < o >."
+            )
         return cleaned
 
     def validate_affiliation(self, value):
@@ -81,10 +85,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             is_privileged = bool(
                 request
                 and request.user
-                and (
-                    request.user.has_role(RoleName.ADMIN)
-                    or request.user.has_role(RoleName.COMITE)
-                )
+                and request.user.has_role(RoleName.ADMIN)
             )
             if is_self or not is_privileged:
                 raise serializers.ValidationError(
@@ -139,6 +140,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
         cleaned = value.strip()
         if not cleaned:
             raise serializers.ValidationError("El nombre completo no puede estar vacío.")
+        if "<" in cleaned or ">" in cleaned:
+            raise serializers.ValidationError(
+                "El nombre completo no puede contener los caracteres < o >."
+            )
         return cleaned
 
     def validate_affiliation(self, value):

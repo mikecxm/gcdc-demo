@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import {
 	Building2,
@@ -42,10 +42,13 @@ const ROLE_STYLES: Record<UserRole, string> = {
 
 export interface UserListViewProps {
 	embedded?: boolean;
+	headerAction?: ReactNode;
 	initialUsers?: UserResponse[];
 	loadUsers?: UserListLoader;
 	onEditProfile?: (user: UserResponse) => void;
+	canEditProfile?: (user: UserResponse) => boolean;
 	onToggleUserStatus?: (user: UserResponse) => void;
+	canToggleUserStatus?: (user: UserResponse) => boolean;
 }
 
 const getInitials = (fullName: string) =>
@@ -62,10 +65,13 @@ const formatDate = (date: string) =>
 
 export const UserListView = ({
 	embedded = false,
+	headerAction,
 	initialUsers,
 	loadUsers = loadDemoUsers,
 	onEditProfile,
+	canEditProfile = () => false,
 	onToggleUserStatus,
+	canToggleUserStatus = () => false,
 }: UserListViewProps) => {
 	const [users, setUsers] = useState<UserResponse[]>(initialUsers ?? []);
 	const isDemo = initialUsers === undefined && loadUsers === loadDemoUsers;
@@ -109,7 +115,6 @@ export const UserListView = ({
 	const [sortOrder, setSortOrder] = useState<'NAME' | 'NEWEST'>('NAME');
 	const profileDialog = useRef<HTMLDialogElement>(null);
 	const tableScroll = useRef<HTMLDivElement>(null);
-
 	const { session } = useAuth();
 
 	const currentUserAuth = (() => {
@@ -117,7 +122,7 @@ export const UserListView = ({
 		try {
 			const parts = session.accessToken.split('.');
 			if (parts.length === 3) {
-				const payload = JSON.parse(atob(parts[1]));
+				const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
 				return {
 					id: typeof payload.user_id === 'number' ? payload.user_id : null,
 					email: typeof payload.email === 'string' ? payload.email.toLowerCase() : null,
@@ -139,7 +144,7 @@ export const UserListView = ({
 	);
 
 	const isDeactivateDisabled = (targetUser: UserResponse) => {
-		if (onToggleUserStatus) return false;
+		if (onToggleUserStatus) return !canToggleUserStatus(targetUser) || isSelf(targetUser);
 		if (isSelf(targetUser)) return true;
 		if (isAuthor) return true;
 		if (!targetUser.is_active) return true;
@@ -159,6 +164,68 @@ export const UserListView = ({
 		if (isAuthor) return `No tienes permisos para desactivar a ${targetUser.full_name}`;
 		return `${targetUser.is_active ? 'Deshabilitar' : 'Activar'} usuario ${targetUser.full_name}`;
 	};
+
+	const directoryRoot = useRef<HTMLElement>(null);
+	const [isCompact, setIsCompact] = useState(false);
+	const compactRef = useRef(false);
+	const [motionEnabled, setMotionEnabled] = useState(() => {
+		try { return localStorage.getItem('symposia.directory.motion') !== 'off'; }
+		catch { return true; }
+	});
+	const toggleMotion = () => {
+		const next = !motionEnabled;
+		setMotionEnabled(next);
+		try { localStorage.setItem('symposia.directory.motion', next ? 'on' : 'off'); }
+		catch { /* The preference remains available for this session. */ }
+	};
+	const motionControl = <button type="button" className="directory-motion-control" aria-label={motionEnabled ? 'Reducir movimiento' : 'Activar animaciones'} aria-pressed={motionEnabled} onClick={toggleMotion} title={motionEnabled ? 'Reducir movimiento' : 'Activar animaciones'}><span aria-hidden="true" className="directory-motion-dot" />Animaciones</button>;
+	const previousCompact = useRef(isCompact);
+	useEffect(() => {
+		const returning = previousCompact.current && !isCompact;
+		previousCompact.current = isCompact;
+		if (!returning || !motionEnabled) return;
+		const elements = directoryRoot.current?.querySelectorAll('.directory-header, .directory-stat');
+		const animations = Array.from(elements ?? []).map((element, index) => {
+			const isCard = element.classList.contains('directory-stat');
+			const frames = isCard ? [
+				{ transform: 'translateY(9px) scale(.992)', opacity: 0, offset: 0 },
+				{ transform: 'translateY(-2px) scale(1.003)', opacity: 1, offset: .65 },
+				{ transform: 'translateY(.5px) scale(1)', opacity: 1, offset: .84 },
+				{ transform: 'translateY(0) scale(1)', opacity: 1, offset: 1 },
+			] : [
+				{ transform: 'translateY(6px)', opacity: 0 },
+				{ transform: 'translateY(0)', opacity: 1 },
+			];
+			return element.animate(frames, {
+				duration: isCard ? 460 : 300, delay: isCard ? 55 + index * 18 : 25,
+				easing: isCard ? 'cubic-bezier(.25,.5,.35,1)' : 'cubic-bezier(.22,1,.36,1)', fill: 'backwards',
+			});
+		});
+		return () => animations.forEach(animation => animation.cancel());
+	}, [isCompact, motionEnabled]);
+	useEffect(() => {
+		const root = directoryRoot.current;
+		const surface = embedded ? root?.closest('[data-workspace-surface]') ?? root?.parentElement : root;
+		if (!surface) return;
+		const wheel = (event: WheelEvent) => {
+			const table = tableScroll.current;
+			if (!table || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+			if ((event.target as Element).closest('dialog, [role="dialog"]')) return;
+			const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? table.clientHeight : 1);
+			if (Math.abs(delta) < 2) return;
+			event.preventDefault();
+			if (delta > 0 && !compactRef.current) {
+				compactRef.current = true;
+				setIsCompact(true);
+			} else if (delta < 0 && table.scrollTop + delta <= 1 && compactRef.current) {
+				compactRef.current = false;
+				setIsCompact(false);
+			}
+			table.scrollTop += delta;
+		};
+		surface.addEventListener('wheel', wheel, { passive: false });
+		return () => surface.removeEventListener('wheel', wheel);
+	}, [embedded]);
 	useEffect(() => {
 		if (tableScroll.current) tableScroll.current.scrollTop = 0;
 	}, [page, searchQuery, selectedRole, selectedStatus, sortOrder]);
@@ -179,7 +246,7 @@ export const UserListView = ({
 	const resetPage = () => setPage(1);
 
 	const handleToggleUserStatus = (user: UserResponse) => {
-		if (onToggleUserStatus) {
+		if (onToggleUserStatus && canToggleUserStatus(user)) {
 			onToggleUserStatus(user);
 			return;
 		}
@@ -205,7 +272,7 @@ export const UserListView = ({
 	};
 
 	const handleEditProfile = (user: UserResponse) => {
-		if (onEditProfile) {
+		if (onEditProfile && canEditProfile(user)) {
 			onEditProfile(user);
 			return;
 		}
@@ -220,13 +287,18 @@ export const UserListView = ({
 	];
 
 	return (
-		<main className={`user-directory w-full text-left${embedded ? ' user-directory--embedded' : ''}`}>
+		<main ref={directoryRoot} className={`user-directory w-full text-left${embedded ? ' user-directory--embedded' : ''}${isCompact ? ' user-directory--compact' : ''}${motionEnabled ? ' user-directory--motion-on' : ' user-directory--motion-off'}`}>
+			<div className="directory-overview" inert={isCompact} aria-hidden={isCompact}>
+			<div className="directory-overview-inner">
 			<header className="directory-header">
 				<div><h1>Directorio de usuarios</h1><p>Consulta las personas, instituciones y permisos de la conferencia.</p></div>
+				<div className="directory-header-actions">{motionControl}{headerAction}</div>
 			</header>
 			<section aria-label="Resumen de usuarios" className="directory-summary">
 				{indicators.map(({ label, count, icon: Icon, tone }) => <article key={tone} className="directory-stat"><span className={`directory-stat-icon directory-stat-icon--${tone}`}><Icon size={21} strokeWidth={1.7} aria-hidden="true" /></span><div><span>{label}</span><strong>{isLoading || loadError ? '\u2014' : count}</strong></div></article>)}
 			</section>
+			</div></div>
+			<div className="directory-compact-heading" aria-hidden={!isCompact} inert={!isCompact}><span>Directorio de usuarios</span><div className="directory-header-actions">{motionControl}<button type="button" onClick={() => { compactRef.current = false; setIsCompact(false); }}>Mostrar resumen</button></div></div>
 			<div className="directory-workspace">
 			<h2 className="sr-only">Listado de personas y filtros</h2>
 
@@ -239,6 +311,7 @@ export const UserListView = ({
 				</div>
 			)}
 
+			<div className="directory-controls">
 			<section aria-label="Buscar y filtrar usuarios" className="directory-toolbar">
 				<div className="grid gap-3 lg:grid-cols-[minmax(16rem,1fr)_13rem_13rem]">
 					<label className="relative block">
@@ -291,11 +364,12 @@ export const UserListView = ({
 					)}
 			</section>
 
-			<section aria-label="Listado de usuarios" aria-busy={isLoading} className="directory-list">
-				<div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+							<div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
 					<p role="status" aria-live="polite" className="text-xs text-slate-500">{isLoading ? 'Cargando usuarios…' : loadError ? 'No se pudo obtener el listado' : `${filteredUsers.length} ${filteredUsers.length === 1 ? 'persona' : 'personas'}${hasActiveFilters ? ' coinciden con los filtros' : ' en el directorio'}`}</p>
 					<label className="directory-sort"><ArrowUpDown size={14} aria-hidden="true" /><span className="sr-only">Ordenar usuarios</span><select value={sortOrder} onChange={(event) => { setSortOrder(event.target.value as 'NAME' | 'NEWEST'); resetPage(); }}><option value="NAME">Nombre A–Z</option><option value="NEWEST">Registro más reciente</option></select></label>
 				</div>
+				</div>
+			<section aria-label="Listado de usuarios" aria-busy={isLoading} className="directory-list">
 				<div ref={tableScroll} className="directory-table-scroll" role="region" aria-label="Tabla de usuarios, área desplazable" tabIndex={0}>
 					<table className="w-full min-w-[760px] border-collapse text-left">
 						<thead className="bg-slate-50">
@@ -354,12 +428,12 @@ export const UserListView = ({
 											<button
 												type="button"
 												onClick={() => handleEditProfile(user)}
-												aria-label={`${onEditProfile ? 'Ver o editar' : 'Ver'} perfil de ${user.full_name}`}
-												title="Ver/Editar perfil"
+												aria-label={`${onEditProfile && canEditProfile(user) ? 'Editar' : 'Ver'} perfil de ${user.full_name}`}
+												title={onEditProfile && canEditProfile(user) ? "Editar perfil" : "Ver perfil"}
 												className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
 											>
 												<Eye aria-hidden="true" className="h-4 w-4" />
-												<span className="directory-profile-label">{onEditProfile ? 'Ver/Editar perfil' : 'Ver perfil'}</span>
+												<span className="directory-profile-label">{onEditProfile && canEditProfile(user) ? 'Editar perfil' : 'Ver perfil'}</span>
 											</button>
 											<button
 												type="button"
@@ -370,7 +444,9 @@ export const UserListView = ({
 												className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 ${
 													isDeactivateDisabled(user)
 														? 'cursor-not-allowed opacity-40 text-slate-400'
-														: 'text-slate-500 hover:bg-rose-50 hover:text-rose-600 focus:ring-rose-500'
+														: user.is_active
+															? 'text-slate-500 hover:bg-rose-50 hover:text-rose-600 focus:ring-rose-500'
+															: 'text-emerald-700 hover:bg-emerald-50 focus:ring-emerald-500'
 												}`}
 											>
 												{user.is_active ? <UserX aria-hidden="true" className="h-4 w-4" /> : <UserCheck aria-hidden="true" className="h-4 w-4" />}

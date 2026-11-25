@@ -46,9 +46,15 @@ def get_balanced_reviewer_suggestions(article, limit=6):
         .exclude(id__in=excluded_ids)
         .exclude(email__in=coauthor_emails)
         .annotate(
-            current_assignments=models.Count("reviewer_assignments")
+            current_assignments=models.Count("reviewer_assignments"),
+            thematic_affinity=models.Count(
+                "reviewer_assignments",
+                filter=models.Q(
+                    reviewer_assignments__article__thematic_line=article.thematic_line
+                ),
+            ),
         )
-        .order_by("current_assignments", "full_name")[:limit]
+        .order_by("current_assignments", "-thematic_affinity", "full_name")[:limit]
     )
 
     return candidates

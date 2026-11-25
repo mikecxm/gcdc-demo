@@ -25,12 +25,22 @@ export interface ResponsibleAuthor {
   affiliation: string;
 }
 
+export interface CommitteeMember {
+  id: number;
+  email: string;
+  full_name: string;
+  roles: ['COMITE'];
+  thematic_lines: string[];
+  assigned_article_count: number;
+}
+
 export interface Article {
   id: number;
   title: string;
   abstract: string;
   keywords: string;
   thematic_line: string;
+  thematic_line_id?: number;
   responsible_author: ResponsibleAuthor;
   status: ArticleStatus;
   is_enabled: boolean;
