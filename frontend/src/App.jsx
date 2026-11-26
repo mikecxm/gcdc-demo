@@ -3,6 +3,7 @@ import { UserRound } from 'lucide-react';
 import { UserProfileForm } from './components/users/UserProfileForm';
 import { apiClient } from './services/api';
 import { ReviewerAssignmentPanel } from './components/articles/ReviewerAssignmentPanel';
+import { ReviewerAssignmentsView } from './components/reviews/ReviewerAssignmentsView';
 import { useState, useEffect } from 'react';
 import { UserListView } from './components/users/UserListView';
 import { loadConfiguredUsers } from './services/usersApi';
@@ -65,6 +66,9 @@ function App() {
     if (hash === '#jurados') {
       return 'jurados';
     }
+    if (hash === '#evaluaciones') {
+      return 'evaluaciones';
+    }
     return 'articulos'; // Pestaña de artículos por defecto
   });
 
@@ -86,6 +90,9 @@ function App() {
       } else if (hash === '#jurados') {
         setCurrentView('workspace');
         setWorkspaceTab('jurados');
+      } else if (hash === '#evaluaciones') {
+        setCurrentView('workspace');
+        setWorkspaceTab('evaluaciones');
       } else if (hash === '#registro' || hash === '#public') {
         setCurrentView('public');
       }
@@ -443,6 +450,47 @@ function App() {
                 </button>
               )}
 
+              {role === 'COMITE' && (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('workspace', 'evaluaciones')}
+                  data-testid="hu13-nav-reviewer-assignments-btn"
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                    workspaceTab === 'evaluaciones'
+                      ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <svg
+                      className={`w-4 h-4 ${
+                        workspaceTab === 'evaluaciones' ? 'text-indigo-600' : 'text-slate-400'
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                      />
+                    </svg>
+                    <span>Mis evaluaciones</span>
+                  </div>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                      workspaceTab === 'evaluaciones'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    HU-13
+                  </span>
+                </button>
+              )}
+
               <div className="pt-2">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 block mb-2">
                   Otros Módulos
@@ -524,6 +572,8 @@ function App() {
                       ? 'Catálogo de Artículos'
                       : workspaceTab === 'usuarios'
                       ? 'Directorio de Usuarios'
+                      : workspaceTab === 'evaluaciones'
+                      ? 'Mis evaluaciones'
                       : 'Asignación de Jurados'}
                   </span>
                 </div>
@@ -561,6 +611,10 @@ function App() {
                 <div className="block min-w-0">
                   <ReviewerAssignmentPanel />
                 </div>
+              )}
+
+              {workspaceTab === 'evaluaciones' && role === 'COMITE' && (
+                <ReviewerAssignmentsView />
               )}
 
               {workspaceTab === 'usuarios' && (

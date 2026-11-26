@@ -7,6 +7,7 @@ import PdfViewer from './PdfViewer';
 import { PdfVersionManager } from './PdfVersionManager';
 import { DisableArticleModal } from './DisableArticleModal';
 import { ArticleMetadataEditForm } from './ArticleMetadataEditForm';
+import { ArticleEvaluationsSummary } from '../reviews/ArticleEvaluationsSummary';
 import {
   X,
   CheckCircle2,
@@ -435,6 +436,8 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
               </div>
             )}
           </div>
+
+          <ArticleEvaluationsSummary articleId={article.id} />
 
           {pdfError?.articleId === article.id ? (
             <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
