@@ -37,12 +37,24 @@ const parseApiError = (error: any): string => {
       return values.filter((v): v is string => typeof v === 'string').join(' · ');
     }
   }
-  return error?.message || 'Error al realizar la asignación en el servidor.';
+  return 'No pudimos cargar las sugerencias de jurados. Intenta actualizar la vista.';
 };
 
 export const ReviewerAssignmentPanel: React.FC = () => {
   const { isAuthenticated, session } = useAuth();
   const role = session?.activeRole;
+  const currentUserId = useMemo(() => {
+    if (!session?.accessToken) return null;
+    try {
+      const payload = JSON.parse(
+        atob(session.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+      ) as { user_id?: unknown };
+      const userId = Number(payload.user_id);
+      return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+    } catch {
+      return null;
+    }
+  }, [session]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoadingArticles, setIsLoadingArticles] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -67,7 +79,10 @@ export const ReviewerAssignmentPanel: React.FC = () => {
           (article) => article.is_enabled && article.status === 'POSTULADO'
         );
         setArticles(submittedArticles);
-        setSelectedArticleId(submittedArticles[0]?.id ?? null);
+        const firstAssignableArticle = submittedArticles.find(
+          (article) => article.responsible_author.id !== currentUserId
+        );
+        setSelectedArticleId(firstAssignableArticle?.id ?? null);
       })
       .catch((error: unknown) => {
         if (!isCurrent) return;
@@ -84,7 +99,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [currentUserId]);
 
   // ───── Load reviewer suggestions when the selected article changes ─────
   useEffect(() => {
@@ -147,6 +162,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   }
 
   const handleSelectArticle = (article: Article) => {
+    if (article.responsible_author.id === currentUserId) return;
     setSelectedArticleId(article.id);
     setSelectedReviewerIds(assignments[article.id] ?? []);
     setSaveMessage(null);
@@ -164,7 +180,12 @@ export const ReviewerAssignmentPanel: React.FC = () => {
   };
 
   const handleSaveAssignment = async () => {
-    if (!selectedArticle || selectedReviewerIds.length !== 3 || isSaving) return;
+    if (
+      !selectedArticle ||
+      selectedArticle.responsible_author.id === currentUserId ||
+      selectedReviewerIds.length !== 3 ||
+      isSaving
+    ) return;
 
     setIsSaving(true);
     setSaveMessage(null);
@@ -205,15 +226,15 @@ export const ReviewerAssignmentPanel: React.FC = () => {
 
   return (
     <section className="min-w-0 space-y-6 text-left">
-      <header className="space-y-2">
-        <span className="block text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-          HU-12 · GESTIÓN EDITORIAL
+      <header className="space-y-2 border-b border-slate-200 pb-4">
+        <span className="symposia-page-eyebrow">
+          CONFERENCIA SYMPOSIA 2026 · ASIGNACIÓN DE JURADOS
         </span>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
-          <ClipboardCheck className="h-6 w-6 flex-shrink-0 text-indigo-600" />
+        <h1 className="symposia-page-title">
+          <ClipboardCheck className="h-7 w-7 flex-shrink-0 text-indigo-600" />
           Asignación de jurados
         </h1>
-        <p className="max-w-3xl text-sm text-slate-500">
+        <p className="symposia-page-description">
           Selecciona exactamente tres miembros del comité para cada artículo postulado.
           Se excluyen automáticamente autores y coautores.
         </p>
@@ -248,14 +269,23 @@ export const ReviewerAssignmentPanel: React.FC = () => {
                 const assignmentCount = assignments[article.id]?.length ?? 0;
                 const isAssigned = assignmentCount === 3;
                 const isSelected = article.id === selectedArticleId;
+                const hasConflictOfInterest = article.responsible_author.id === currentUserId;
                 return (
                   <button
                     key={article.id}
                     type="button"
+                    disabled={hasConflictOfInterest}
                     aria-pressed={isSelected}
+                    aria-label={
+                      hasConflictOfInterest
+                        ? `${article.title}. No asignable: eres el autor responsable.`
+                        : article.title
+                    }
                     onClick={() => handleSelectArticle(article)}
                     className={`w-full min-w-0 rounded-xl border p-4 text-left transition-colors ${
-                      isSelected
+                      hasConflictOfInterest
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-75'
+                        : isSelected
                         ? 'border-indigo-300 bg-indigo-50 shadow-sm'
                         : 'border-slate-200 bg-white hover:border-indigo-200'
                     }`}
@@ -288,6 +318,11 @@ export const ReviewerAssignmentPanel: React.FC = () => {
                       )}
                       {isAssigned ? '3 jurados asignados' : 'Pendiente de jurados'}
                     </span>
+                    {hasConflictOfInterest && (
+                      <span className="mt-2 block text-xs font-medium text-rose-700">
+                        No asignable: eres el autor responsable.
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -321,7 +356,7 @@ export const ReviewerAssignmentPanel: React.FC = () => {
 
               {isLoadingCandidates ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                  Consultando sugerencias del backend...
+                  Buscando jurados disponibles...
                 </div>
               ) : candidatesError ? (
                 <div
@@ -428,6 +463,16 @@ export const ReviewerAssignmentPanel: React.FC = () => {
                   ? `Artículo en estado ${selectedArticle.status}`
                   : 'Guardar asignación'}
               </button>
+            </section>
+          )}
+          {!selectedArticle && articles.some(
+            (article) => article.responsible_author.id === currentUserId
+          ) && (
+            <section
+              className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"
+              role="status"
+            >
+              Tu artículo aparece en la lista, pero no puedes asignarle jurados por conflicto de interés.
             </section>
           )}
         </div>

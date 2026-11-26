@@ -15,6 +15,11 @@ from .serializers import (
 from .services import get_balanced_reviewer_suggestions, validate_reviewer_conflicts
 
 
+AUTHOR_ASSIGNMENT_CONFLICT = (
+    "No puedes asignar jurados a un artículo del que eres autor responsable."
+)
+
+
 class AssignReviewersView(APIView):
     """Assign exactly three eligible committee members to a submitted article."""
 
@@ -37,6 +42,12 @@ class AssignReviewersView(APIView):
                 return Response(
                     {"detail": "Artículo no encontrado o deshabilitado."},
                     status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if article.responsible_author_id == request.user.id:
+                return Response(
+                    {"detail": AUTHOR_ASSIGNMENT_CONFLICT},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             if article.status != ArticleStatus.POSTULADO:
@@ -108,6 +119,12 @@ class SuggestReviewersView(APIView):
             return Response(
                 {"detail": "Artículo no encontrado o deshabilitado."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if article.responsible_author_id == request.user.id:
+            return Response(
+                {"detail": AUTHOR_ASSIGNMENT_CONFLICT},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         candidates = get_balanced_reviewer_suggestions(article)

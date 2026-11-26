@@ -22,7 +22,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const ROLE_STYLES: Record<UserRole, string> = {
   ADMIN: 'border-indigo-200 bg-indigo-50 text-indigo-700',
   COMITE: 'border-violet-200 bg-violet-50 text-violet-700',
-  AUTOR: 'border-sky-200 bg-sky-50 text-sky-700',
+  AUTOR: 'border-indigo-100 bg-indigo-50/50 text-indigo-700',
 };
 
 const getInitials = (fullName: string) =>

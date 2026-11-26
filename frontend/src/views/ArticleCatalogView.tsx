@@ -9,6 +9,7 @@ import type { Article, ArticleStatus } from '../types/article';
 import type { ThematicLine } from '../services/articlesApi';
 import { getStatusBadgeConfig } from '../types/article';
 import { ArticleDetailModal } from '../components/articles/ArticleDetailModal';
+import { useAuth } from '../context/SessionContext';
 import {
   Search,
   Filter,
@@ -20,7 +21,6 @@ import {
   Eye,
   Building2,
   Layers,
-  Info,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -28,6 +28,9 @@ const isArticleStatus = (value: string): value is ArticleStatus =>
   ARTICLE_STATUSES.some((status) => status.value === value);
 
 export const ArticleCatalogView: React.FC = () => {
+  const { session } = useAuth();
+  const activeRole = session?.activeRole;
+
   // Estados de datos
   const [allArticles, setAllArticles] = useState<Article[]>([]);
   const [thematicLines, setThematicLines] = useState<ThematicLine[]>([]);
@@ -74,6 +77,13 @@ export const ArticleCatalogView: React.FC = () => {
   }, [loadThematicLines]);
 
   const loadArticles = useCallback(async (signal?: AbortSignal) => {
+    if (!activeRole) {
+      setAllArticles([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -93,7 +103,7 @@ export const ArticleCatalogView: React.FC = () => {
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedThematicLine]);
+  }, [activeRole, searchQuery, selectedStatus, selectedThematicLine]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -156,19 +166,19 @@ export const ArticleCatalogView: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-2 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-indigo-600 tracking-wider uppercase">
+              <span className="symposia-page-eyebrow">
                 CONFERENCIA SYMPOSIA 2026
               </span>
               <span className="text-slate-300">•</span>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              <span className="symposia-page-eyebrow text-slate-500">
                 GESTIÓN EDITORIAL
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2.5">
+            <h1 className="symposia-page-title">
               <BookOpen className="w-7 h-7 text-indigo-600 flex-shrink-0" />
               <span>Catálogo de Artículos</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            <p className="symposia-page-description">
               Explora, filtra y consulta los manuscritos postulados a la conferencia académica.
             </p>
           </div>
@@ -199,15 +209,6 @@ export const ArticleCatalogView: React.FC = () => {
           </div>
         )}
 
-        <div className="p-3.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 text-indigo-900 flex items-start gap-3 text-xs">
-          <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 space-y-0.5">
-            <span className="font-semibold block">Visibilidad aplicada por el backend</span>
-            <p className="text-[11px] leading-relaxed opacity-90">
-              La API valida tu token, limita los artículos según tus permisos y excluye los deshabilitados.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* ========================================================

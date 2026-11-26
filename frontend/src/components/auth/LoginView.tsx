@@ -10,11 +10,10 @@ import {
 import { useAuth, type Role } from "../../context/SessionContext";
 import RoleSelectorModal from "./RoleSelectorModal";
 import { PasswordRecoveryWizard } from "../users/PasswordRecoveryWizard";
+import { SymposiaLogo } from "../brand/SymposiaLogo";
+import { AuthBrandPanel } from "./AuthBrandPanel";
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
-
-const LIBRARY_BG_URL =
-  "https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1600&auto=format&fit=crop";
 
 function getErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -64,13 +63,33 @@ export default function LoginView() {
 
 if (showRecovery) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <PasswordRecoveryWizard
-        onRequestPin={requestPasswordResetPin}
-        onResetPassword={confirmPasswordReset}
-        onBack={() => setShowRecovery(false)}
-      />
-    </main>
+    <div className="flex min-h-screen w-full bg-slate-50 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 lg:h-screen lg:overflow-hidden">
+      <AuthBrandPanel />
+      <div className="flex min-h-screen w-full flex-col justify-between overflow-y-auto bg-slate-50 p-4 sm:p-8 lg:h-screen lg:min-h-0 lg:w-1/2 lg:p-12 xl:w-7/12">
+        <header className="mx-auto flex w-full max-w-lg items-center justify-between gap-2 pb-6">
+          <SymposiaLogo size="sm" />
+          <button
+            type="button"
+            onClick={() => setShowRecovery(false)}
+            className="text-xs font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+          >
+            Volver a iniciar sesión
+          </button>
+        </header>
+
+        <main className="my-auto py-4">
+          <PasswordRecoveryWizard
+            onRequestPin={requestPasswordResetPin}
+            onResetPassword={confirmPasswordReset}
+            onBack={() => setShowRecovery(false)}
+          />
+        </main>
+
+        <footer className="mx-auto w-full max-w-lg pt-6 text-center text-xs text-slate-400">
+          <p>© 2026 Universidad del Valle · Sistema de Gestión de Conferencias Symposia</p>
+        </footer>
+      </div>
+    </div>
   );
 }
 
@@ -134,70 +153,14 @@ if (showRecovery) {
     pendingRoles ?? (session && !session.activeRole ? session.roles : null);
 
   return (
-    <div className="min-h-screen flex w-full bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Lado izquierdo: Fotografía arquitectónica con branding Symposia (visible en pantallas lg: >=1024px) */}
-      <div className="hidden lg:relative lg:flex lg:w-1/2 xl:w-5/12 bg-slate-900 overflow-hidden">
-        <img
-          src={LIBRARY_BG_URL}
-          alt="Symposia Biblioteca Conferencia"
-          className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-slate-950/80" />
-
-        <div className="relative z-10 p-10 flex flex-col justify-between h-full w-full">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-white block leading-none">
-                symposia
-              </span>
-              <span className="text-[9px] font-semibold tracking-widest text-slate-300 uppercase block mt-1">
-                GESTOR DE CONFERENCIAS
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-2 max-w-sm">
-            <h3 className="text-2xl font-bold text-white tracking-tight">
-              Gestión Científica de Conferencias
-            </h3>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Sistema oficial para la postulación, revisión por pares y edición académica de la Universidad del Valle.
-            </p>
-          </div>
-
-          <div className="text-xs text-slate-400">
-            Universidad del Valle · 2026
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen flex w-full bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 lg:h-screen lg:overflow-hidden">
+      <AuthBrandPanel />
 
       {/* Lado derecho: Portal y Formulario flotante de Login */}
-      <div className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between min-h-screen p-4 sm:p-8 lg:p-12 bg-slate-50 overflow-y-auto">
+      <div className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between min-h-screen p-4 sm:p-8 lg:h-screen lg:min-h-0 lg:p-12 bg-slate-50 overflow-y-auto">
         {/* Header superior del portal */}
         <header className="flex items-center justify-between w-full max-w-lg mx-auto pb-6 gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2"
-                />
-              </svg>
-            </div>
-            <span className="font-bold text-slate-900 text-sm">symposia</span>
-          </div>
+          <SymposiaLogo size="sm" />
 
           <div className="flex items-center gap-3">
             <Link
@@ -211,7 +174,7 @@ if (showRecovery) {
 
         {/* Tarjeta principal de Login (alineada con UserCreationForm) */}
         <main className="my-auto py-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8 w-full max-w-lg mx-auto text-left relative">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8 w-full max-w-lg mx-auto text-left relative">
             {/* Header del formulario */}
             <div className="flex items-start justify-between mb-5">
               <div className="flex items-center gap-3">
@@ -226,9 +189,10 @@ if (showRecovery) {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  <p className="symposia-page-eyebrow">CONFERENCIA SYMPOSIA 2026 · ACCESO</p>
+                  <h1 className="symposia-page-title">
                     Iniciar sesión
-                  </h2>
+                  </h1>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                     Ingresa tus credenciales para acceder al sistema Symposia.
                   </p>
@@ -317,15 +281,17 @@ if (showRecovery) {
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">
                   Verificación de seguridad
                 </label>
-                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 flex items-center justify-center overflow-x-auto min-h-[82px]">
+                <div className="flex min-h-[82px] items-center justify-center overflow-hidden">
                   {SITE_KEY ? (
-                    <ReCAPTCHA
-                      ref={recaptchaRef}
-                      sitekey={SITE_KEY}
-                      onChange={(token) => setCaptchaToken(token)}
-                      onExpired={() => setCaptchaToken(null)}
-                      onErrored={() => setCaptchaToken(null)}
-                    />
+                    <div className="recaptcha-widget flex justify-center">
+                      <ReCAPTCHA
+                        ref={recaptchaRef}
+                        sitekey={SITE_KEY}
+                        onChange={(token) => setCaptchaToken(token)}
+                        onExpired={() => setCaptchaToken(null)}
+                        onErrored={() => setCaptchaToken(null)}
+                      />
+                    </div>
                   ) : (
                     <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-center w-full">
                       Falta configurar <code className="font-mono font-semibold">VITE_RECAPTCHA_SITE_KEY</code> en el archivo .env

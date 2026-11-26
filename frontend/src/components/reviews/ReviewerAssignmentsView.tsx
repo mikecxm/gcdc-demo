@@ -130,16 +130,16 @@ export const ReviewerAssignmentsView = () => {
       className="min-w-0 space-y-6 text-left"
       data-testid="hu13-reviewer-assignments-view"
     >
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <span className="block text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-            HU-13 · EVALUACIÓN CIENTÍFICA
+          <span className="symposia-page-eyebrow">
+            CONFERENCIA SYMPOSIA 2026 · EVALUACIÓN CIENTÍFICA
           </span>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
-            <ClipboardCheck className="h-6 w-6 shrink-0 text-indigo-600" />
+          <h1 className="symposia-page-title">
+            <ClipboardCheck className="h-7 w-7 shrink-0 text-indigo-600" />
             Mis evaluaciones
           </h1>
-          <p className="max-w-3xl text-sm text-slate-500">
+          <p className="symposia-page-description">
             Consulta tus artículos asignados, revisa el manuscrito y envía el dictamen.
           </p>
         </div>

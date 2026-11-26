@@ -15,7 +15,7 @@ function isUser(value: unknown): value is UserResponse {
 // Supports a full array or DRF pagination; loads all pages for client pagination.
 export function createUserListLoader(endpoint: string): UserListLoader {
   return async (signal) => {
-    if (!endpoint.trim()) throw new Error('El listado de usuarios aún no está conectado.');
+    if (!endpoint.trim()) throw new Error('No pudimos cargar los usuarios. Inténtalo de nuevo.');
     const base = new URL(`${apiClient.defaults.baseURL?.replace(/\/$/, '')}/`, window.location.origin);
     let next: string | null = new URL(endpoint.replace(/^\//, ''), base).href;
     const visited = new Set<string>();

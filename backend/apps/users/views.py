@@ -57,7 +57,8 @@ class UserRegisterView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
-        data["role"] = RoleName.AUTOR
+        data.pop("role", None)
+        data["roles"] = [RoleName.AUTOR]
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -66,13 +67,13 @@ class UserRegisterView(generics.CreateAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
-        serializer.save(role=RoleName.AUTOR)
+        serializer.save(roles=[RoleName.AUTOR])
 
 
 class AdminUserCreateView(generics.CreateAPIView):
     """
     Endpoint administrativo para creación de usuarios.
-    Permite asignar ADMIN, COMITE o AUTOR.
+    Permite asignar uno o varios roles; solo ADMIN puede asignar ADMIN.
     Protegido por IsAuthenticated e IsAdminOrCommittee.
     """
 

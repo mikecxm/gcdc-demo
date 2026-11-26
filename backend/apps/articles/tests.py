@@ -204,6 +204,52 @@ class ArticleEndpointsTests(APITestCase):
         self.assertEqual(len(returned_ids), 3)
         self.assertNotIn(self.art_author1_disabled.id, returned_ids)
 
+    def test_multi_role_user_visibility_follows_active_role(self):
+        multi_role_user = User.objects.create_user(
+            email="multirol@univalle.edu.co",
+            password="Password123!",
+            full_name="Usuario Multirol",
+            affiliation="Universidad del Valle",
+            roles=[RoleName.AUTOR, RoleName.COMITE],
+        )
+        own_article = Article.objects.create(
+            title="Artículo del usuario multirol",
+            abstract="Resumen de prueba.",
+            keywords="prueba",
+            thematic_line=self.line_ia,
+            responsible_author=multi_role_user,
+            status=ArticleStatus.POSTULADO,
+            is_enabled=True,
+        )
+        self.client.force_authenticate(user=multi_role_user)
+
+        author_response = self.client.get(
+            self.list_url, HTTP_X_ACTIVE_ROLE=RoleName.AUTOR
+        )
+        self.assertEqual(author_response.status_code, status.HTTP_200_OK)
+        author_ids = [item["id"] for item in author_response.data]
+        self.assertEqual(author_ids, [own_article.id])
+
+        committee_response = self.client.get(
+            self.list_url, HTTP_X_ACTIVE_ROLE=RoleName.COMITE
+        )
+        self.assertEqual(committee_response.status_code, status.HTTP_200_OK)
+        committee_ids = [item["id"] for item in committee_response.data]
+        self.assertEqual(len(committee_ids), 4)
+        self.assertIn(self.art_author2_ia.id, committee_ids)
+
+        other_article_url = reverse(
+            "article-detail", kwargs={"pk": self.art_author2_ia.pk}
+        )
+        author_detail = self.client.get(
+            other_article_url, HTTP_X_ACTIVE_ROLE=RoleName.AUTOR
+        )
+        self.assertEqual(author_detail.status_code, status.HTTP_403_FORBIDDEN)
+        committee_detail = self.client.get(
+            other_article_url, HTTP_X_ACTIVE_ROLE=RoleName.COMITE
+        )
+        self.assertEqual(committee_detail.status_code, status.HTTP_200_OK)
+
     # -------------------------------------------------------------
     # GCDC-145: 3. Filtros Combinados y Búsqueda
     # -------------------------------------------------------------

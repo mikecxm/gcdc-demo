@@ -27,7 +27,7 @@ export default function RoleSelectorModal({ roles, onConfirm }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="role-modal-title"
-        className="w-full max-w-md rounded-2xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-100 text-left relative"
+        className="w-full max-w-md rounded-2xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-200 text-left relative"
       >
         <div className="flex items-start gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">

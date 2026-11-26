@@ -312,16 +312,16 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 		}`;
 
 	return (
-		<main className="article-submission relative isolate flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#f2f4f5] lg:h-[100dvh] lg:flex-row">
+		<main className="article-submission relative isolate flex min-h-[100dvh] w-full flex-col overflow-hidden bg-slate-50 lg:h-[100dvh] lg:flex-row">
 			<div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-				<span className="absolute -left-72 top-[8%] h-[36rem] w-[36rem] rounded-full bg-blue-950" />
+				<span className="absolute -left-72 top-[8%] h-[36rem] w-[36rem] rounded-full bg-indigo-950" />
 				<span className="absolute left-[38%] top-[28%] h-72 w-72 rounded-full bg-indigo-200" />
 				<span className="absolute -right-48 bottom-[-9rem] h-[34rem] w-[34rem] rounded-full bg-slate-200" />
 			</div>
 
 			<section className="article-submission-panel relative z-10 order-1 h-[100dvh] w-full min-w-0 p-3 sm:p-5 lg:min-h-0 lg:w-7/12 lg:p-6 2xl:w-6/12 2xl:p-8">
 				<div className="relative mx-auto h-full min-h-0 w-full max-w-3xl">
-					<div className="relative mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white/95 text-left">
+					<div className="relative mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/95 text-left shadow-xl">
 					<header className="article-submission-header relative z-20 shrink-0 border-b border-slate-200 bg-white px-5 py-5 sm:px-7 sm:py-6">
 						<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 							<div className="min-w-0">
@@ -334,8 +334,12 @@ export const ArticleSubmissionForm = ({ onBackToMenu }: { onBackToMenu: () => vo
 									<ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
 									Artículos y Postulaciones
 								</button>
-								<h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Postular artículo</h1>
-								<p className="mt-1 text-sm text-slate-500">
+								<p className="symposia-page-eyebrow">CONFERENCIA SYMPOSIA 2026 · POSTULACIÓN</p>
+								<h1 className="symposia-page-title">
+									<FileText aria-hidden="true" className="h-7 w-7 shrink-0 text-indigo-600" />
+									Postular artículo
+								</h1>
+								<p className="symposia-page-description">
 									Completa los metadatos y adjunta la versión inicial en PDF.
 								</p>
 							</div>

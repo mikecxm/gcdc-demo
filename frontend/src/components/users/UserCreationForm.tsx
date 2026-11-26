@@ -37,7 +37,7 @@ const userSchema = z
       .string()
       .trim()
       .min(2, 'La afiliación universitaria es obligatoria'),
-    role: z.enum(['ADMIN', 'COMITE', 'AUTOR'] as const),
+    roles: z.array(z.enum(['ADMIN', 'COMITE', 'AUTOR'] as const)).min(1, 'Selecciona al menos un rol'),
     password: z
       .string()
       .min(8, 'Mínimo 8 caracteres')
@@ -55,6 +55,7 @@ export type UserFormData = z.infer<typeof userSchema>;
 interface UserCreationFormProps {
   mode: 'public' | 'admin';
   authToken?: string;
+  currentUserRoles?: UserRole[];
   onSuccess?: (user: UserResponse) => void;
   onCancel?: () => void;
   isModal?: boolean;
@@ -63,6 +64,7 @@ interface UserCreationFormProps {
 export const UserCreationForm: React.FC<UserCreationFormProps> = ({
   mode,
   authToken,
+  currentUserRoles = [],
   onSuccess,
   onCancel,
   isModal = false,
@@ -95,13 +97,14 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
       full_name: '',
       email: '',
       affiliation: '',
-      role: 'AUTOR',
+      roles: ['AUTOR'],
       password: '',
       confirm_password: '',
     },
   });
 
-  const selectedRole = watch('role');
+  const selectedRoles = watch('roles') ?? [];
+  const canAssignAdmin = currentUserRoles.includes('ADMIN');
 
   useEffect(() => {
     if (toast.show) {
@@ -134,22 +137,24 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
           email: data.email,
           affiliation: data.affiliation,
           password: data.password,
-          role: data.role as UserRole,
+          roles: data.roles,
         });
       }
 
-      setToast({
-        show: true,
-        type: 'success',
-        title: '¡Usuario creado exitosamente!',
-        message: `${createdUser.full_name} (${createdUser.email}) fue registrado en el sistema.`,
-      });
+      if (mode === 'public') {
+        setToast({
+          show: true,
+          type: 'success',
+          title: 'Tu cuenta está lista',
+          message: 'El registro se completó correctamente. Ya puedes iniciar sesión.',
+        });
+      }
 
       reset({
         full_name: '',
         email: '',
         affiliation: '',
-        role: 'AUTOR',
+        roles: ['AUTOR'],
         password: '',
         confirm_password: '',
       });
@@ -174,8 +179,14 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
               : responseData.password;
             setError('password', { type: 'server', message: passMsg });
           }
+          if (responseData.roles) {
+            const rolesMsg = Array.isArray(responseData.roles)
+              ? responseData.roles.join(' ')
+              : responseData.roles;
+            setGlobalError(String(rolesMsg));
+          }
           if (responseData.detail) {
-            setGlobalError(responseData.detail);
+            setGlobalError(String(responseData.detail));
           }
         } else if (err.response?.status === 401 || err.response?.status === 403) {
           setGlobalError('No tienes los permisos necesarios para realizar esta acción.');
@@ -189,7 +200,7 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
   };
 
   const formContent = (
-    <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8 w-full max-w-lg mx-auto text-left relative">
+    <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8 w-full max-w-lg mx-auto text-left relative">
       {/* Alerta Toast de Confirmación Flotante */}
       {toast.show && (
         <div
@@ -248,6 +259,9 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
             )}
           </div>
           <div>
+            {mode === 'public' && (
+              <p className="symposia-page-eyebrow">CONFERENCIA SYMPOSIA 2026 · REGISTRO</p>
+            )}
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">
               {mode === 'admin' ? 'Añadir usuario' : 'Crea tu cuenta de autor'}
             </h2>
@@ -379,124 +393,58 @@ export const UserCreationForm: React.FC<UserCreationFormProps> = ({
           )}
         </div>
 
-        {/* Selector de Rol en Modo Admin: 3 Tarjetas Radio Estilo Symposia con WAI-ARIA */}
+        {/* Selector de roles asignables desde el panel de administración */}
         {mode === 'admin' && (
-          <div className="pt-1">
-            <span id="role-group-label" className="block text-xs font-medium text-slate-700 mb-2">
-              Rol asignado
-            </span>
-            <div
-              role="radiogroup"
-              aria-labelledby="role-group-label"
-              className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
-            >
-              {/* Tarjeta: Administrador */}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selectedRole === 'ADMIN'}
-                onClick={() => setValue('role', 'ADMIN', { shouldValidate: true })}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                  selectedRole === 'ADMIN'
-                    ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-2">
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      selectedRole === 'ADMIN' ? 'border-indigo-600' : 'border-slate-300'
-                    }`}
-                  >
-                    {selectedRole === 'ADMIN' && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    selectedRole === 'ADMIN' ? 'text-indigo-900' : 'text-slate-800'
-                  }`}
-                >
-                  Administrador
-                </span>
-              </button>
+          <fieldset className="pt-1">
+            <legend id="role-group-label" className="mb-2 block text-xs font-medium text-slate-700">
+              Roles asignados
+            </legend>
+            <div aria-labelledby="role-group-label" className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              {([
+                { value: 'ADMIN', label: 'Administrador' },
+                { value: 'COMITE', label: 'Comité Científico' },
+                { value: 'AUTOR', label: 'Autor' },
+              ] as const).map(({ value, label }) => {
+                const selected = selectedRoles.includes(value);
+                const lockedAdmin = value === 'ADMIN' && !canAssignAdmin;
 
-              {/* Tarjeta: Comité Científico */}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selectedRole === 'COMITE'}
-                onClick={() => setValue('role', 'COMITE', { shouldValidate: true })}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                  selectedRole === 'COMITE'
-                    ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-2">
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      selectedRole === 'COMITE' ? 'border-indigo-600' : 'border-slate-300'
-                    }`}
+                return (
+                  <label
+                    key={value}
+                    className={`flex items-center gap-2.5 rounded-xl border p-3 text-xs font-semibold transition ${
+                      selected
+                        ? 'border-indigo-600 bg-indigo-50/40 text-indigo-900 ring-1 ring-indigo-600'
+                        : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50/50'
+                    } ${lockedAdmin ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                   >
-                    {selectedRole === 'COMITE' && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    selectedRole === 'COMITE' ? 'text-indigo-900' : 'text-slate-800'
-                  }`}
-                >
-                  Comité Científico
-                </span>
-              </button>
-
-              {/* Tarjeta: Autor */}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={selectedRole === 'AUTOR'}
-                onClick={() => setValue('role', 'AUTOR', { shouldValidate: true })}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                  selectedRole === 'AUTOR'
-                    ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-2">
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      selectedRole === 'AUTOR' ? 'border-indigo-600' : 'border-slate-300'
-                    }`}
-                  >
-                    {selectedRole === 'AUTOR' && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-                    )}
-                  </div>
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    selectedRole === 'AUTOR' ? 'text-indigo-900' : 'text-slate-800'
-                  }`}
-                >
-                  Autor
-                </span>
-              </button>
+                    <input
+                      type="checkbox"
+                      value={value}
+                      checked={selected}
+                      disabled={lockedAdmin}
+                      onChange={() => {
+                        const nextRoles = selected
+                          ? selectedRoles.filter((role) => role !== value)
+                          : [...selectedRoles, value];
+                        setValue('roles', nextRoles, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }}
+                      className="h-4 w-4 shrink-0 accent-indigo-600"
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
             </div>
-
-            {/* Texto de ayuda contextual por rol */}
-            <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-              {selectedRole === 'ADMIN' &&
-                'Los administradores pueden gestionar usuarios, roles y la configuración de la conferencia.'}
-              {selectedRole === 'COMITE' &&
-                'El comité científico evalúa artículos, coordina revisiones y dictamina postulaciones.'}
-              {selectedRole === 'AUTOR' &&
-                'Los autores pueden registrar artículos, subir versiones PDF y consultar sus evaluaciones.'}
+            {errors.roles && (
+              <p className="mt-1 text-xs text-red-600">{errors.roles.message}</p>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              Puedes asignar uno o varios roles. Solo un administrador puede asignar el rol de Administrador.
             </p>
-          </div>
+          </fieldset>
         )}
 
         {/* Contraseña y Confirmación */}

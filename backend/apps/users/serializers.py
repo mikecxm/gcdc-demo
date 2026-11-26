@@ -49,10 +49,16 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
     )
+    roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=RoleName.choices),
+        required=False,
+        allow_empty=False,
+        write_only=True,
+    )
 
     class Meta:
         model = CustomUser
-        fields = ["full_name", "affiliation", "bio", "role"]
+        fields = ["full_name", "affiliation", "bio", "role", "roles"]
 
     def validate_full_name(self, value):
         cleaned = value.strip()
@@ -73,37 +79,65 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        request = self.context.get("request")
         has_role_attempt = "role" in self.initial_data or "roles" in self.initial_data
-        if has_role_attempt:
-            is_self = bool(
-                self.instance
-                and request
-                and request.user
-                and self.instance.id == request.user.id
+        if not has_role_attempt:
+            return attrs
+
+        error_field = "role" if "role" in self.initial_data else "roles"
+        if "role" in attrs and "roles" in attrs:
+            raise serializers.ValidationError(
+                {"roles": "Envía el campo 'roles' o el campo 'role', no ambos."}
             )
-            is_privileged = bool(
-                request
-                and request.user
-                and request.user.has_role(RoleName.ADMIN)
+
+        legacy_role = attrs.pop("role", None)
+        requested_roles = attrs.get("roles")
+        if legacy_role is not None:
+            requested_roles = [legacy_role]
+            attrs["roles"] = requested_roles
+        if not requested_roles:
+            raise serializers.ValidationError(
+                {error_field: "Selecciona al menos un rol."}
             )
-            if is_self or not is_privileged:
-                raise serializers.ValidationError(
-                    {"role": "No tienes permiso para modificar roles o auto-asignarte un rol."}
-                )
+        if len(set(requested_roles)) != len(requested_roles):
+            raise serializers.ValidationError(
+                {error_field: "No se puede asignar el mismo rol más de una vez."}
+            )
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        is_admin = bool(user and user.is_authenticated and user.has_role(RoleName.ADMIN))
+        is_privileged = is_admin or bool(
+            user and user.is_authenticated and user.has_role(RoleName.COMITE)
+        )
+        if not is_privileged:
+            raise serializers.ValidationError(
+                {error_field: "No tienes permiso para modificar los roles de esta cuenta."}
+            )
+
+        currently_admin = self.instance.has_role(RoleName.ADMIN)
+        requested_admin = RoleName.ADMIN in requested_roles
+        if currently_admin != requested_admin and not is_admin:
+            raise serializers.ValidationError(
+                {error_field: "Solo un administrador puede asignar o retirar el rol de administrador."}
+            )
         return attrs
 
     def update(self, instance, validated_data):
-        new_role = validated_data.pop("role", None)
+        new_roles = validated_data.pop("roles", None)
         for attr, val in validated_data.items():
             setattr(instance, attr, val)
 
         with transaction.atomic():
             instance.save()
-            if new_role:
-                role_obj, _ = Role.objects.get_or_create(name=new_role)
+            if new_roles is not None:
                 UserRole.objects.filter(user=instance).delete()
-                UserRole.objects.create(user=instance, role=role_obj)
+                roles = [
+                    Role.objects.get_or_create(name=role_name)[0]
+                    for role_name in new_roles
+                ]
+                UserRole.objects.bulk_create(
+                    [UserRole(user=instance, role=role) for role in roles]
+                )
 
         return instance
 
@@ -120,8 +154,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
     )
     role = serializers.ChoiceField(
         choices=RoleName.choices,
-        default=RoleName.AUTOR,
         required=False,
+        write_only=True,
+    )
+    roles = serializers.ListField(
+        child=serializers.ChoiceField(choices=RoleName.choices),
+        required=False,
+        allow_empty=False,
         write_only=True,
     )
 
@@ -134,6 +173,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "affiliation",
             "password",
             "role",
+            "roles",
         ]
 
     def validate_full_name(self, value):
@@ -167,8 +207,33 @@ class UserCreateSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate(self, attrs):
+        if "role" in attrs and "roles" in attrs:
+            raise serializers.ValidationError(
+                {"roles": "Envía el campo 'roles' o el campo 'role', no ambos."}
+            )
+
+        legacy_role = attrs.pop("role", None)
+        requested_roles = attrs.get("roles")
+        if requested_roles is None:
+            requested_roles = [legacy_role or RoleName.AUTOR]
+            attrs["roles"] = requested_roles
+        if len(set(requested_roles)) != len(requested_roles):
+            raise serializers.ValidationError(
+                {"roles": "No se puede asignar el mismo rol más de una vez."}
+            )
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        is_admin = bool(user and user.is_authenticated and user.has_role(RoleName.ADMIN))
+        if RoleName.ADMIN in requested_roles and not is_admin:
+            raise serializers.ValidationError(
+                {"roles": "Solo un administrador puede asignar el rol de administrador."}
+            )
+        return attrs
+
     def create(self, validated_data):
-        role_name = validated_data.pop("role", RoleName.AUTOR)
+        role_names = validated_data.pop("roles", [RoleName.AUTOR])
         raw_password = validated_data.pop("password")
         validated_data.setdefault("is_active", True)
 
@@ -176,8 +241,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
             validated_data["password"] = make_password(raw_password)
             user = CustomUser.objects.create(**validated_data)
 
-            role, _ = Role.objects.get_or_create(name=role_name)
-            UserRole.objects.create(user=user, role=role)
+            roles = [
+                Role.objects.get_or_create(name=role_name)[0]
+                for role_name in role_names
+            ]
+            UserRole.objects.bulk_create(
+                [UserRole(user=user, role=role) for role in roles]
+            )
 
         return user
 

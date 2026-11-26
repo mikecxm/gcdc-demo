@@ -7,24 +7,37 @@ import { apiClient, type UserResponse, type UserRole } from '../../services/api'
 interface Props {
   isOpen: boolean;
   targetUser: UserResponse | null;
-  currentUser: { id: number; role: UserRole } | null;
+  currentUser: { id: number; roles: UserRole[] } | null;
   onClose: () => void;
   onSaved: (user: UserResponse) => void;
   onNotice: (message: string, error?: boolean) => void;
 }
-type Values = { full_name: string; affiliation: string; role: UserRole };
+type Values = { full_name: string; affiliation: string; roles: UserRole[] };
 
 export function UserProfileForm({ isOpen, targetUser, currentUser, onClose, onSaved, onNotice }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { register, reset, handleSubmit, formState: { errors, isSubmitting } } = useForm<Values>();
-  const canEdit = Boolean(currentUser && targetUser && (currentUser.id === targetUser.id || ['ADMIN', 'COMITE'].includes(currentUser.role)));
+  const { register, reset, handleSubmit, setError, setValue, watch, formState: { errors, isSubmitting } } = useForm<Values>({
+    defaultValues: { full_name: '', affiliation: '', roles: [] },
+  });
+  const canEdit = Boolean(currentUser && targetUser && (
+    currentUser.id === targetUser.id || currentUser.roles.some(role => role === 'ADMIN' || role === 'COMITE')
+  ));
   const isOwnProfile = Boolean(currentUser && targetUser && currentUser.id === targetUser.id);
-  const canChangeRole = currentUser?.role === 'ADMIN' && currentUser.id !== targetUser?.id;
+  const canChangeRoles = Boolean(
+    currentUser && targetUser &&
+    currentUser.roles.some(role => role === 'ADMIN' || role === 'COMITE')
+  );
+  const canAssignAdmin = currentUser?.roles.includes('ADMIN') ?? false;
+  const selectedRoles = watch('roles') ?? [];
   useEffect(() => {
     if (isOpen && targetUser) {
       setApiError(null);
-      reset({ full_name: targetUser.full_name, affiliation: targetUser.affiliation, role: targetUser.roles[0] });
+      reset({
+        full_name: targetUser.full_name,
+        affiliation: targetUser.affiliation,
+        roles: targetUser.roles,
+      });
       const element = dialog.current;
       element?.showModal();
       const previous = document.body.style.overflow;
@@ -37,9 +50,20 @@ export function UserProfileForm({ isOpen, targetUser, currentUser, onClose, onSa
   const submit = handleSubmit(async (values) => {
     if (!canEdit || !targetUser) return;
     setApiError(null);
+    let rolesToSave = [...values.roles];
+    if (!canAssignAdmin) {
+      rolesToSave = rolesToSave.filter(role => role !== 'ADMIN');
+      if (targetUser.roles.includes('ADMIN')) rolesToSave.push('ADMIN');
+    }
+    if (canChangeRoles && rolesToSave.length === 0) {
+      setError('roles', { type: 'validate', message: 'Selecciona al menos un rol.' });
+      return;
+    }
+    const rolesChanged = rolesToSave.length !== targetUser.roles.length ||
+      targetUser.roles.some(role => !rolesToSave.includes(role));
     try {
       const payload = { full_name: values.full_name.trim(), affiliation: values.affiliation.trim(),
-        ...(canChangeRole && values.role !== targetUser.roles[0] ? { role: values.role } : {}) };
+        ...(canChangeRoles && rolesChanged ? { roles: rolesToSave } : {}) };
       const { data } = await apiClient.patch<UserResponse>(`/users/${targetUser.id}/`, payload);
       onSaved(data);
       onNotice('Perfil actualizado correctamente');
@@ -90,12 +114,37 @@ export function UserProfileForm({ isOpen, targetUser, currentUser, onClose, onSa
           </section>
           <section aria-labelledby="profile-access-title" className="border-t border-slate-100 pt-6">
             <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-slate-400" aria-hidden="true" /><h3 id="profile-access-title" className="text-sm font-semibold text-slate-900">Permisos de la cuenta</h3></div>
-            {canChangeRole ? <fieldset disabled={!canEdit || isSubmitting} className="mt-4">
-              <legend className={label}>Rol asignado</legend>
-              <div className="mt-2 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">{(['ADMIN', 'COMITE', 'AUTOR'] as const).map(role => <label key={role} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-3.5 text-xs font-medium text-slate-600 transition has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:text-indigo-700 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-400"><input type="radio" value={role} {...register('role')} className="accent-indigo-600" />{roleLabels[role]}</label>)}</div>
-              <p className="mt-2 text-xs text-slate-500">El rol determina el acceso a las funciones de la conferencia.</p>
-            </fieldset> : <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3.5"><div><p className="text-xs font-medium text-slate-500">Rol asignado</p><p className="mt-1 text-sm font-semibold text-slate-800">{targetUser?.roles.map(role => roleLabels[role]).join(' · ')}</p></div><LockKeyhole size={16} className="shrink-0 text-slate-400" aria-label="Rol protegido" /></div>}
-            {!canChangeRole && <p className="mt-2 text-xs leading-relaxed text-slate-400">{isOwnProfile ? 'Tu rol es gestionado por un administrador.' : 'Solo un administrador puede cambiar el rol de otra persona.'}</p>}
+            {canChangeRoles ? <fieldset disabled={!canEdit || isSubmitting} className="mt-4">
+              <legend className={label}>Roles asignados</legend>
+              <div className="mt-2 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
+                {(['ADMIN', 'COMITE', 'AUTOR'] as const).map(role => {
+                  const selected = selectedRoles.includes(role);
+                  const lockedAdmin = role === 'ADMIN' && !canAssignAdmin;
+                  return (
+                    <label key={role} className={`flex items-center gap-2 rounded-xl border px-3 py-3.5 text-xs font-medium transition ${selected ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600'} ${lockedAdmin ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={lockedAdmin}
+                        onChange={() => {
+                          const nextRoles = selected
+                            ? selectedRoles.filter(value => value !== role)
+                            : [...selectedRoles, role];
+                          setValue('roles', nextRoles, { shouldDirty: true, shouldValidate: true });
+                        }}
+                        className="accent-indigo-600"
+                      />
+                      {roleLabels[role]}
+                    </label>
+                  );
+                })}
+              </div>
+              {errors.roles && <p className="mt-2 text-xs text-rose-600">{errors.roles.message}</p>}
+              <p className="mt-2 text-xs text-slate-500">
+                Puedes asignar varios roles. Solo un administrador puede asignar o retirar el rol de Administrador.
+              </p>
+            </fieldset> : <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3.5"><div><p className="text-xs font-medium text-slate-500">Roles asignados</p><p className="mt-1 text-sm font-semibold text-slate-800">{targetUser?.roles.map(role => roleLabels[role]).join(' · ')}</p></div><LockKeyhole size={16} className="shrink-0 text-slate-400" aria-label="Roles protegidos" /></div>}
+            {!canChangeRoles && <p className="mt-2 text-xs leading-relaxed text-slate-400">{isOwnProfile ? 'Tus roles son gestionados por un administrador o miembro del comité.' : 'No tienes permiso para cambiar los roles de esta persona.'}</p>}
           </section>
         </div>
         <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-5 sm:px-8">

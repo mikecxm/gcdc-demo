@@ -9,7 +9,11 @@ from apps.conferences.models import Article, Conference
 from apps.users.models import RoleName
 
 from .filters import ArticleFilter
-from .permissions import IsArticleAuthor, IsArticleOwnerOrCommitteeOrAdmin
+from .permissions import (
+    IsArticleAuthor,
+    IsArticleOwnerOrCommitteeOrAdmin,
+    get_active_role,
+)
 from .serializers import ArticleDetailSerializer, ArticleUpdateSerializer
 
 
@@ -18,8 +22,8 @@ class ArticleListView(generics.ListAPIView):
     GET /api/v1/articles/ (y /api/articles/)
     Listado de artículos con soporte de filtros y RBAC (GCDC-145):
     - Excluye siempre registros deshabilitados (is_enabled=False).
-    - Si el usuario tiene rol AUTOR: lista exclusivamente sus propios artículos.
-    - Si el usuario tiene rol COMITE o ADMIN: lista todos los artículos activos.
+    - Con rol activo AUTOR: lista exclusivamente sus propios artículos.
+    - Con rol activo COMITE o ADMIN: lista todos los artículos activos.
     """
 
     serializer_class = ArticleDetailSerializer
@@ -38,12 +42,11 @@ class ArticleListView(generics.ListAPIView):
             .prefetch_related("coauthors", "versions")
         )
 
-        # Comité y Administradores tienen visibilidad global del catálogo activo
-        if user.has_role(RoleName.ADMIN) or user.has_role(RoleName.COMITE):
+        active_role = get_active_role(self.request)
+        if active_role in (RoleName.ADMIN, RoleName.COMITE):
             return base_qs
 
-        # Autores: visibilidad restringida a sus propios artículos
-        if user.has_role(RoleName.AUTOR):
+        if active_role == RoleName.AUTOR:
             return base_qs.filter(responsible_author=user)
 
         # Usuarios autenticados sin rol específico asignado

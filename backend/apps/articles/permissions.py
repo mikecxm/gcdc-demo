@@ -2,11 +2,27 @@ from rest_framework.permissions import BasePermission
 from apps.users.models import RoleName
 
 
+def get_active_role(request):
+    user = request.user
+    requested_role = request.headers.get("X-Active-Role")
+
+    if requested_role:
+        if requested_role in RoleName.values and user.has_role(requested_role):
+            return requested_role
+        return None
+
+    # Without an explicit role context, prefer the least-privileged matching role.
+    for role in (RoleName.AUTOR, RoleName.COMITE, RoleName.ADMIN):
+        if user.has_role(role):
+            return role
+    return None
+
+
 class IsArticleOwnerOrCommitteeOrAdmin(BasePermission):
     """
     Permiso para acceso a objetos de tipo Artículo:
-    - Miembros del Comité y Administradores tienen visibilidad completa de lectura.
-    - Autores únicamente pueden consultar el detalle de sus propios artículos.
+    - Con rol activo Comité o Administrador hay visibilidad completa de lectura.
+    - Con rol activo Autor solo se permite consultar artículos propios.
     """
 
     message = "No tienes permiso para consultar este artículo."
@@ -19,12 +35,12 @@ class IsArticleOwnerOrCommitteeOrAdmin(BasePermission):
         if not user or not user.is_authenticated:
             return False
 
-        # Administrador y Comité tienen acceso a cualquier artículo activo
-        if user.has_role(RoleName.ADMIN) or user.has_role(RoleName.COMITE):
+        active_role = get_active_role(request)
+        if active_role in (RoleName.ADMIN, RoleName.COMITE):
             return True
 
         # El autor responsable solo puede acceder si es el propietario
-        if user.has_role(RoleName.AUTOR):
+        if active_role == RoleName.AUTOR:
             return obj.responsible_author_id == user.id
 
         return False

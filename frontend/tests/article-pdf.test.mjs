@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
 let vite, apiClient, getArticlePdf, uploadArticleVersion;
+let activeRole = 'AUTOR';
 before(async () => {
-  globalThis.localStorage = { getItem: () => 'session-token' };
+  globalThis.localStorage = {
+    getItem: (key) => key === 'symposia_auth_token'
+      ? 'session-token'
+      : key === 'symposia_active_role'
+        ? activeRole
+        : null,
+  };
   vite = await createServer({ server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
   ({ apiClient } = await vite.ssrLoadModule('/src/services/api.ts'));
   ({ getArticlePdf, uploadArticleVersion } = await vite.ssrLoadModule('/src/services/articlesApi.ts'));
@@ -17,9 +24,23 @@ test('PDF uses authenticated backend endpoint and preserves file bytes', async (
     assert.equal(config.url, '/articles/12/pdf/');
     assert.equal(config.responseType, 'blob');
     assert.equal(config.headers.Authorization, 'Bearer session-token');
+    assert.equal(config.headers.get('X-Active-Role'), 'AUTOR');
     return { data: blob, status: 200, headers: {}, config };
   };
   assert.equal(await getArticlePdf(12), blob);
+});
+
+test('article requests send the newly selected active role', async () => {
+  activeRole = 'COMITE';
+  apiClient.defaults.adapter = async (config) => {
+    assert.equal(config.headers.get('X-Active-Role'), 'COMITE');
+    return { data: new Blob(['%PDF-1.4'], { type: 'application/pdf' }), status: 200, headers: {}, config };
+  };
+  try {
+    await getArticlePdf(12);
+  } finally {
+    activeRole = 'AUTOR';
+  }
 });
 
 test('HTML application response is rejected instead of embedded as a manuscript', async () => {
@@ -45,6 +66,7 @@ test('multipart version upload sends FormData with a generated boundary', async 
     const request = input instanceof Request ? input : new Request(input, init);
     assert.match(request.headers.get('Content-Type') ?? '', /^multipart\/form-data; boundary=/i);
     assert.equal(request.headers.get('Authorization'), 'Bearer session-token');
+    assert.equal(request.headers.get('X-Active-Role'), 'AUTOR');
     assert.match(request.url, /\/api\/v1\/articles\/12\/versions\/$/);
     assert.equal((await request.formData()).get('pdf')?.name, 'article.pdf');
     return new Response(

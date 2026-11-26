@@ -12,12 +12,11 @@ import { ArticleSubmissionForm } from './components/articles/ArticleSubmissionFo
 import { ArticleCatalogView } from './views/ArticleCatalogView';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/SessionContext';
-
-const LIBRARY_BG_URL =
-  'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=1600&auto=format&fit=crop';
+import { SymposiaLogo } from './components/brand/SymposiaLogo';
+import { AuthBrandPanel } from './components/auth/AuthBrandPanel';
 
 function App() {
-  const { session, logout, startSession } = useAuth();
+  const { session, logout, startSession, selectActiveRole } = useAuth();
   const canAccessReviewerAssignment = session?.activeRole === "ADMIN" || session?.activeRole === "COMITE";
   const [deactivationTarget, setDeactivationTarget] = useState(null);
   const [profileTarget, setProfileTarget] = useState(null);
@@ -114,6 +113,21 @@ function App() {
     }
   };
 
+  const handleActiveRoleChange = (event) => {
+    const nextRole = event.target.value;
+    if (!session?.roles.includes(nextRole)) return;
+
+    selectActiveRole(nextRole);
+    setIsSubmissionOpen(false);
+    if (
+      (workspaceTab === 'evaluaciones' && nextRole !== 'COMITE') ||
+      (workspaceTab === 'jurados' && nextRole === 'AUTOR')
+    ) {
+      setWorkspaceTab('articulos');
+      window.location.hash = '#articulos';
+    }
+  };
+
   const userInitials = user?.full_name
     ? user.full_name
         .split(' ')
@@ -159,71 +173,20 @@ function App() {
           notifyProfile('Usuario desactivado correctamente');
         }}
       />
-      <UserProfileForm isOpen={Boolean(profileTarget)} targetUser={profileTarget} currentUser={currentUserId ? { id: currentUserId, role: session?.activeRole } : null} onClose={() => setProfileTarget(null)} onNotice={notifyProfile} onSaved={(updated) => { setDirectoryVersion(value => value + 1); if (updated.id === currentUserId) startSession({ ...session, fullName: updated.full_name }); }} />
+      <UserProfileForm isOpen={Boolean(profileTarget)} targetUser={profileTarget} currentUser={currentUserId ? { id: currentUserId, roles: session?.roles ?? [] } : null} onClose={() => setProfileTarget(null)} onNotice={notifyProfile} onSaved={(updated) => { setDirectoryVersion(value => value + 1); if (updated.id === currentUserId) { const activeRole = session?.activeRole && updated.roles.includes(session.activeRole) ? session.activeRole : updated.roles[0] ?? null; startSession({ ...session, fullName: updated.full_name, roles: updated.roles, activeRole }); } }} />
       {profileNotice && <div role={profileNotice.error ? 'alert' : 'status'} className={`fixed right-4 top-4 z-[100] max-w-sm rounded-xl border p-4 text-sm shadow-lg ${profileNotice.error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{profileNotice.message}<button type="button" aria-label="Cerrar notificación" onClick={() => setProfileNotice(null)} className="ml-3">×</button></div>}
       {/* ========================================================
           1. VISTA PÚBLICA (SPLIT SCREEN: ARQUITECTURA + PORTAL)
          ======================================================== */}
       {currentView === 'public' && (
-        <div className="min-h-screen flex w-full">
-          {/* Lado izquierdo: Fotografía arquitectónica con branding Symposia (visible en lg: >=1024px) */}
-          <div className="hidden lg:relative lg:flex lg:w-1/2 xl:w-5/12 bg-slate-900 overflow-hidden">
-            <img
-              src={LIBRARY_BG_URL}
-              alt="Symposia Biblioteca Conferencia"
-              className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-luminosity scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-slate-950/80" />
-
-            <div className="relative z-10 p-10 flex flex-col justify-between h-full w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-xl font-bold tracking-tight text-white block leading-none">
-                    symposia
-                  </span>
-                  <span className="text-[9px] font-semibold tracking-widest text-slate-300 uppercase block mt-1">
-                    GESTOR DE CONFERENCIAS
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2 max-w-sm">
-                <h3 className="text-2xl font-bold text-white tracking-tight">
-                  Gestión Científica de Conferencias
-                </h3>
-                <p className="text-sm text-slate-300 leading-relaxed">
-                  Sistema oficial para la postulación, revisión por pares y edición académica de la Universidad del Valle.
-                </p>
-              </div>
-
-              <div className="text-xs text-slate-400">
-                Universidad del Valle · 2026
-              </div>
-            </div>
-          </div>
+        <div className="min-h-screen flex w-full lg:h-screen lg:overflow-hidden">
+          <AuthBrandPanel />
 
           {/* Lado derecho: Portal y Formulario flotante */}
-          <div className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between min-h-screen p-4 sm:p-8 lg:p-12 bg-slate-50 overflow-y-auto">
+          <div className="w-full lg:w-1/2 xl:w-7/12 flex flex-col justify-between min-h-screen p-4 sm:p-8 lg:h-screen lg:min-h-0 lg:p-12 bg-slate-50 overflow-y-auto">
             {/* Header del portal */}
             <header className="flex items-center justify-between w-full max-w-lg mx-auto pb-6 gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2" />
-                  </svg>
-                </div>
-                <span className="font-bold text-slate-900 text-sm">symposia</span>
-              </div>
+              <SymposiaLogo size="sm" />
 
               <div className="flex items-center gap-3">
                 <button
@@ -252,7 +215,7 @@ function App() {
                   <span className="font-semibold block mb-1">
                     Usuario registrado en la base de datos (Respuesta HTTP 201):
                   </span>
-                  <pre className="bg-white/80 p-2 rounded text-[11px] overflow-x-auto">
+                  <pre className="max-w-full whitespace-pre-wrap break-all rounded bg-white/80 p-2 text-[11px]">
                     {JSON.stringify(lastCreatedUser, null, 2)}
                   </pre>
                 </div>
@@ -290,19 +253,7 @@ function App() {
             <div className="shrink-0 space-y-6">
               {/* Brand */}
               <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                      />
-                    </svg>
-                  </div>
-                  <span className="text-lg font-bold tracking-tight text-slate-900">symposia</span>
-                </div>
+                <SymposiaLogo size="md" />
 
                 <button
                   type="button"
@@ -340,11 +291,11 @@ function App() {
                 Espacio de Trabajo
               </span>
 
-              {/* Ítem: Catálogo de Artículos (HU-08 / GCDC-144) */}
+              {/* Catálogo de artículos */}
               <button
                 type="button"
                 onClick={() => navigateTo('workspace', 'articulos')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                className={`w-full flex items-center justify-start px-3 py-2 rounded-xl font-medium text-left transition-colors ${
                   workspaceTab === 'articulos'
                     ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100'
@@ -368,22 +319,13 @@ function App() {
                   </svg>
                   <span>Artículos y Postulaciones</span>
                 </div>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                    workspaceTab === 'articulos'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  HU-08
-                </span>
               </button>
 
               {/* Ítem: Directorio de Usuarios */}
               <button
                 type="button"
                 onClick={() => navigateTo('workspace', 'usuarios')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                className={`w-full flex items-center justify-start px-3 py-2 rounded-xl font-medium text-left transition-colors ${
                   workspaceTab === 'usuarios'
                     ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100'
@@ -409,12 +351,12 @@ function App() {
                 </div>
               </button>
 
-              {/* Ítem: Asignación de Jurados (HU-12) — solo ADMIN y COMITE */}
+              {/* Asignación de jurados — solo ADMIN y COMITE */}
               {canAccessReviewerAssignment && (
                 <button
                   type="button"
                   onClick={() => navigateTo('workspace', 'jurados')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                  className={`w-full flex items-center justify-start px-3 py-2 rounded-xl font-medium text-left transition-colors ${
                     workspaceTab === 'jurados'
                       ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100'
@@ -438,15 +380,6 @@ function App() {
                     </svg>
                     <span>Asignación de Jurados</span>
                   </div>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                      workspaceTab === 'jurados'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    HU-12
-                  </span>
                 </button>
               )}
 
@@ -455,7 +388,7 @@ function App() {
                   type="button"
                   onClick={() => navigateTo('workspace', 'evaluaciones')}
                   data-testid="hu13-nav-reviewer-assignments-btn"
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-medium transition-colors ${
+                  className={`w-full flex items-center justify-start px-3 py-2 rounded-xl font-medium text-left transition-colors ${
                     workspaceTab === 'evaluaciones'
                       ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100'
@@ -479,15 +412,6 @@ function App() {
                     </svg>
                     <span>Mis evaluaciones</span>
                   </div>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                      workspaceTab === 'evaluaciones'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    HU-13
-                  </span>
                 </button>
               )}
 
@@ -579,15 +503,35 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={openMyProfile} disabled={isProfileLoading} aria-busy={isProfileLoading} aria-haspopup="dialog" className="inline-flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60 sm:px-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button type="button" onClick={openMyProfile} disabled={isProfileLoading} aria-label="Abrir mi perfil" aria-busy={isProfileLoading} aria-haspopup="dialog" className="inline-flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60 sm:px-3">
                   <UserRound className="h-4 w-4" aria-hidden="true" />
-                  <span>{isProfileLoading ? 'Cargando?' : 'Mi perfil'}</span>
+                  <span className="hidden sm:inline">{isProfileLoading ? 'Cargando…' : 'Mi perfil'}</span>
                 </button>
                 <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-                <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
-                  {roleLabel}
-                </span>
+                {session?.roles.length > 1 ? (
+                  <label>
+                    <span className="sr-only">Cambiar vista activa</span>
+                    <select
+                      value={role ?? ''}
+                      onChange={handleActiveRoleChange}
+                      aria-label="Cambiar vista activa"
+                      title="Cambiar vista activa"
+                      data-testid="active-role-switcher"
+                      className="h-9 w-[5.5rem] rounded-lg border border-indigo-200 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 sm:w-auto sm:min-w-[8rem]"
+                    >
+                      {session.roles.map((userRole) => (
+                        <option key={userRole} value={userRole}>
+                          {userRole === 'ADMIN' ? 'Admin' : userRole === 'COMITE' ? 'Comité' : 'Autor'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md">
+                    {roleLabel}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -629,6 +573,7 @@ function App() {
             {isAdminModalOpen && (
               <UserCreationForm
                 mode="admin"
+                currentUserRoles={session?.roles ?? []}
                 isModal={true}
                 onCancel={() => setIsAdminModalOpen(false)}
                 onSuccess={(newUser) => {
