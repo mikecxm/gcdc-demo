@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import {
+  ACTIVE_ROLE_KEY,
   ACCESS_TOKEN_KEY,
   clearStoredAuth,
   REFRESH_TOKEN_KEY,
@@ -12,6 +13,7 @@ export interface UserCreatePayload {
   full_name: string;
   affiliation: string;
   password: string;
+  roles?: UserRole[];
   role?: UserRole;
 }
 
@@ -43,8 +45,14 @@ apiClient.interceptors.request.use((config) => {
   }
 
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const activeRole = localStorage.getItem(ACTIVE_ROLE_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (activeRole) {
+    config.headers.set('X-Active-Role', activeRole);
+  } else {
+    config.headers.delete('X-Active-Role');
   }
   return config;
 });
@@ -102,7 +110,7 @@ apiClient.interceptors.response.use(
 );
 
 export const registerUser = async (
-  payload: Omit<UserCreatePayload, 'role'>
+  payload: Omit<UserCreatePayload, 'role' | 'roles'>
 ): Promise<UserResponse> => {
   const response = await apiClient.post<UserResponse>('/users/register/', payload);
   return response.data;

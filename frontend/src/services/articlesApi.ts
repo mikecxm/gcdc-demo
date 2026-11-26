@@ -231,7 +231,7 @@ export const getArticleApiErrorMessage = (error: unknown): string => {
   }
 
   if (!error.response) {
-    return 'No fue posible conectarse con el servidor. Verifica que el backend esté en ejecución.';
+    return 'No pudimos conectar con el servicio. Verifica tu conexión e inténtalo de nuevo.';
   }
 
   const data: unknown = error.response.data;
@@ -252,8 +252,8 @@ export const getArticleApiErrorMessage = (error: unknown): string => {
   if (message) return message;
   if (error.response.status === 401) return 'Inicia sesión con una cuenta válida para consultar los artículos.';
   if (error.response.status === 403) return 'No tienes permiso para consultar estos artículos.';
-  if (error.response.status === 404) return 'El recurso solicitado no existe en el servidor.';
-  return `El servidor respondió con el código ${error.response.status}.`;
+  if (error.response.status === 404) return 'No encontramos la información solicitada.';
+  return 'No pudimos completar la solicitud. Inténtalo de nuevo más tarde.';
 };
 
 export const getArticleVersions = async (

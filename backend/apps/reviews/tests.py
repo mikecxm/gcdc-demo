@@ -182,6 +182,34 @@ class AssignReviewersTests(APITestCase):
             ArticleReviewer.objects.filter(article=self.article).count(), 0
         )
 
+    def test_committee_author_cannot_suggest_or_assign_jurors_to_own_article(self):
+        self.article.responsible_author = self.committee_and_author
+        self.article.save(update_fields=["responsible_author"])
+        self.client.force_authenticate(user=self.committee_and_author)
+
+        suggestions_response = self.client.get(
+            self.suggest_url, {"article_id": self.article.id}
+        )
+        assignments_response = self.client.post(
+            self.assign_url,
+            {
+                "article_id": self.article.id,
+                "reviewer_ids": [
+                    self.committee1.id,
+                    self.committee2.id,
+                    self.committee4.id,
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(suggestions_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(assignments_response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("conflicto de interés", assignments_response.data["detail"])
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.POSTULADO)
+        self.assertFalse(ArticleReviewer.objects.filter(article=self.article).exists())
+
     # -----------------------------------------------------------------
     # 3. Conflicto de interés: coautor como jurado
     # -----------------------------------------------------------------

@@ -85,7 +85,7 @@ const getDemoVerdict = (votes: EvaluationDecision[]): EvaluationDecision | null 
 
 const createDemoPdf = (): Blob => {
   const content =
-    'BT /F1 22 Tf 72 720 Td (HU-13 - Manuscrito de demostracion) Tj ' +
+    'BT /F1 22 Tf 72 720 Td (Manuscrito de demostracion) Tj ' +
     '0 -36 Td /F1 12 Tf (Documento PDF local para revisar el flujo de evaluacion.) Tj ET';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -221,11 +221,11 @@ export const getArticleEvaluationSummary = async (
 
 export const getReviewApiErrorMessage = (error: unknown): string => {
   if (!axios.isAxiosError(error)) {
-    return error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
+    return 'No se pudo completar la evaluación. Inténtalo nuevamente.';
   }
 
   if (!error.response) {
-    return 'No fue posible conectarse con el servidor de evaluaciones.';
+    return 'No pudimos conectar con el servicio. Verifica tu conexión e inténtalo de nuevo.';
   }
 
   const responseData: unknown = error.response.data;
@@ -243,8 +243,8 @@ export const getReviewApiErrorMessage = (error: unknown): string => {
     case 403:
       return 'No tienes permiso para evaluar este artículo.';
     case 404:
-      return 'El endpoint de evaluaciones aún no está disponible o el recurso no existe.';
+      return 'No encontramos la información solicitada.';
     default:
-      return `El servidor respondió con el código ${error.response.status}.`;
+      return 'No pudimos completar la solicitud. Inténtalo de nuevo más tarde.';
   }
 };

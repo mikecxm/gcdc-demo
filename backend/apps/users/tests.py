@@ -64,6 +64,18 @@ class UserRegistrationTests(APITestCase):
         self.assertFalse(created_user.has_role(RoleName.ADMIN))
         self.assertTrue(created_user.is_active)
 
+    def test_public_registration_ignores_submitted_roles(self):
+        payload = {
+            "email": "registro.sin_escalacion@univalle.edu.co",
+            "password": "Password123!",
+            "full_name": "Registro Público",
+            "affiliation": "Universidad del Valle",
+            "roles": [RoleName.ADMIN, RoleName.COMITE],
+        }
+        response = self.client.post(self.register_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["roles"], [RoleName.AUTOR])
+
     def test_public_registration_duplicate_email_returns_400(self):
         payload = {
             "email": "autor@univalle.edu.co",  # Ya existe
@@ -125,6 +137,47 @@ class UserRegistrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertNotIn("password", response.data)
         self.assertEqual(response.data["roles"], [RoleName.ADMIN])
+
+    def test_committee_can_create_user_with_multiple_non_admin_roles(self):
+        self.client.force_authenticate(user=self.committee_user)
+        payload = {
+            "email": "multirol.comite@univalle.edu.co",
+            "password": "Password123!",
+            "full_name": "Usuario Multirol",
+            "affiliation": "Universidad del Valle",
+            "roles": [RoleName.COMITE, RoleName.AUTOR],
+        }
+        response = self.client.post(self.admin_create_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(set(response.data["roles"]), {RoleName.COMITE, RoleName.AUTOR})
+
+    def test_committee_cannot_create_user_with_admin_role(self):
+        self.client.force_authenticate(user=self.committee_user)
+        payload = {
+            "email": "no.admin.por.comite@univalle.edu.co",
+            "password": "Password123!",
+            "full_name": "No Administrador",
+            "affiliation": "Universidad del Valle",
+            "roles": [RoleName.COMITE, RoleName.ADMIN],
+        }
+        response = self.client.post(self.admin_create_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(
+            User.objects.filter(email="no.admin.por.comite@univalle.edu.co").exists()
+        )
+
+    def test_admin_can_create_user_with_multiple_roles_including_admin(self):
+        self.client.force_authenticate(user=self.admin_user)
+        payload = {
+            "email": "admin.autor@univalle.edu.co",
+            "password": "Password123!",
+            "full_name": "Administrador Autor",
+            "affiliation": "Universidad del Valle",
+            "roles": [RoleName.ADMIN, RoleName.AUTOR],
+        }
+        response = self.client.post(self.admin_create_url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(set(response.data["roles"]), {RoleName.ADMIN, RoleName.AUTOR})
 
     def test_admin_create_rejects_short_password(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -399,13 +452,78 @@ class UserUpdateEndpointTests(APITestCase):
         self.assertFalse(self.author_1.has_role(RoleName.ADMIN))
         self.assertTrue(self.author_1.has_role(RoleName.AUTOR))
 
-    def test_committee_cannot_change_another_users_role(self):
+    def test_committee_can_assign_multiple_non_admin_roles(self):
         self.client.force_authenticate(user=self.committee)
         url = reverse("user-detail", kwargs={"pk": self.author_1.id})
-        response = self.client.patch(url, {"role": RoleName.ADMIN}, format="json")
+        response = self.client.patch(
+            url, {"roles": [RoleName.COMITE, RoleName.AUTOR]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.data["roles"]), {RoleName.COMITE, RoleName.AUTOR})
+        self.author_1.refresh_from_db()
+        self.assertEqual(
+            set(self.author_1.roles.values_list("name", flat=True)),
+            {RoleName.COMITE, RoleName.AUTOR},
+        )
+
+    def test_committee_can_update_own_roles_without_admin(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.committee.id})
+        response = self.client.patch(
+            url, {"roles": [RoleName.COMITE, RoleName.AUTOR]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.data["roles"]), {RoleName.COMITE, RoleName.AUTOR})
+
+    def test_committee_cannot_assign_admin_role_to_self(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.committee.id})
+        response = self.client.patch(
+            url, {"roles": [RoleName.COMITE, RoleName.ADMIN]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.committee.refresh_from_db()
+        self.assertEqual(
+            set(self.committee.roles.values_list("name", flat=True)),
+            {RoleName.COMITE},
+        )
+
+    def test_committee_cannot_assign_admin_role(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.patch(
+            url, {"roles": [RoleName.ADMIN, RoleName.AUTOR]}, format="json"
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.author_1.refresh_from_db()
-        self.assertEqual(list(self.author_1.roles.values_list("name", flat=True)), [RoleName.AUTOR])
+        self.assertEqual(
+            set(self.author_1.roles.values_list("name", flat=True)),
+            {RoleName.AUTOR},
+        )
+
+    def test_admin_can_edit_multiple_roles_and_assign_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        url = reverse("user-detail", kwargs={"pk": self.author_1.id})
+        response = self.client.patch(
+            url,
+            {"roles": [RoleName.ADMIN, RoleName.COMITE, RoleName.AUTOR]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            set(response.data["roles"]),
+            {RoleName.ADMIN, RoleName.COMITE, RoleName.AUTOR},
+        )
+
+    def test_committee_cannot_remove_an_existing_admin_role(self):
+        self.client.force_authenticate(user=self.committee)
+        url = reverse("user-detail", kwargs={"pk": self.admin.id})
+        response = self.client.patch(
+            url, {"roles": [RoleName.AUTOR]}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.has_role(RoleName.ADMIN))
 
     def test_email_cannot_be_changed_via_patch(self):
         self.client.force_authenticate(user=self.author_1)

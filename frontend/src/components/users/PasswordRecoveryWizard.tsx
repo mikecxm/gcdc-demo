@@ -131,12 +131,13 @@ const resendPin = async () => {
 };
 
 return (
-    <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8">
+    <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-6">
         <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
             {step === 1 ? <Mail size={22} /> : <ShieldCheck size={22} />}
         </div>
         <div>
+            <p className="symposia-page-eyebrow">CONFERENCIA SYMPOSIA 2026 · RECUPERACIÓN</p>
             <h2 className="text-xl font-bold text-slate-900">
             Recuperar contraseña
             </h2>

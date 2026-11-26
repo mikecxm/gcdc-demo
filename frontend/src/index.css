@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .symposia-page-eyebrow {
+    @apply block text-[10px] font-bold uppercase tracking-wider text-indigo-600;
+  }
+
+  .symposia-page-title {
+    @apply mt-1 flex min-w-0 items-center gap-2.5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl;
+  }
+
+  .symposia-page-description {
+    @apply mt-1 max-w-3xl text-sm leading-relaxed text-slate-500;
+  }
+}
+
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', sans-serif;
   color-scheme: light;
@@ -10,6 +24,8 @@
 body {
   margin: 0;
   padding: 0;
+  max-width: 100%;
+  overflow-x: clip;
   background-color: #ffffff;
   color: #0f172a; /* slate-900 */
   -webkit-font-smoothing: antialiased;
@@ -18,6 +34,7 @@ body {
 #root {
   min-height: 100vh;
   width: 100%;
+  max-width: 100%;
 }
 
 .article-form-scroll {
@@ -59,4 +76,18 @@ body {
 
 .visual-panel-copy {
   text-shadow: 0 1px 1px rgb(255 255 255 / 0.8);
+}
+
+.recaptcha-widget {
+  width: 304px;
+  max-width: 100%;
+  transform: scale(0.88);
+  transform-origin: center;
+}
+
+@media (min-width: 640px) {
+  .recaptcha-widget {
+    width: auto;
+    transform: none;
+  }
 }

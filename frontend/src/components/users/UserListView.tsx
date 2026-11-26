@@ -36,7 +36,7 @@ const AVATAR_COLORS = ['#e8eaf6', '#e4ede9', '#f3e8de', '#e8e6ef', '#e1ecf1'];
 const ROLE_STYLES: Record<UserRole, string> = {
 	ADMIN: 'border-indigo-200 bg-indigo-50 text-indigo-700',
 	COMITE: 'border-violet-200 bg-violet-50 text-violet-700',
-	AUTOR: 'border-sky-200 bg-sky-50 text-sky-700',
+	AUTOR: 'border-indigo-100 bg-indigo-50/50 text-indigo-700',
 };
 
 
@@ -291,7 +291,11 @@ export const UserListView = ({
 			<div className="directory-overview" inert={isCompact} aria-hidden={isCompact}>
 			<div className="directory-overview-inner">
 			<header className="directory-header">
-				<div><h1>Directorio de usuarios</h1><p>Consulta las personas, instituciones y permisos de la conferencia.</p></div>
+				<div>
+					<p className="symposia-page-eyebrow">CONFERENCIA SYMPOSIA 2026 · ADMINISTRACIÓN</p>
+					<h1 className="symposia-page-title"><Users aria-hidden="true" className="h-7 w-7 shrink-0 text-indigo-600" />Directorio de usuarios</h1>
+					<p className="symposia-page-description">Consulta las personas, instituciones y permisos de la conferencia.</p>
+				</div>
 				<div className="directory-header-actions">{motionControl}{headerAction}</div>
 			</header>
 			<section aria-label="Resumen de usuarios" className="directory-summary">
@@ -370,8 +374,8 @@ export const UserListView = ({
 				</div>
 				</div>
 			<section aria-label="Listado de usuarios" aria-busy={isLoading} className="directory-list">
-				<div ref={tableScroll} className="directory-table-scroll" role="region" aria-label="Tabla de usuarios, área desplazable" tabIndex={0}>
-					<table className="w-full min-w-[760px] border-collapse text-left">
+				<div ref={tableScroll} className="directory-table-scroll" role="region" aria-label="Tabla de usuarios" tabIndex={0}>
+					<table className="w-full border-collapse text-left">
 						<thead className="bg-slate-50">
 							<tr>
 								<th scope="col" className="px-4 py-3 text-xs font-medium text-slate-500 sm:px-5">Usuario</th>
