@@ -2,7 +2,15 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Article, ArticleMetadataAudit, ArticleStatus, ThematicLine
+from .models import (
+    Article,
+    ArticleMetadataAudit,
+    ArticleReviewer,
+    ArticleStatus,
+    PresentationApprovalStatus,
+    PresentacionAval,
+    ThematicLine,
+)
 
 User = get_user_model()
 
@@ -133,4 +141,63 @@ class ArticleDisablementTests(TestCase):
         self.article.title = final_title
         self.article.save()
         self.assertEqual(ArticleMetadataAudit.objects.filter(article=self.article).count(), 3)
+
+
+class PresentationApprovalDatabaseTests(TestCase):
+    """Pruebas de GCDC-170 (HU-14): registro del aval de presentación."""
+
+    def setUp(self):
+        author = User.objects.create_user(
+            email="autor.presentacion@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Presentación",
+            affiliation="Universidad del Valle",
+        )
+        thematic_line = ThematicLine.objects.create(name="Presentación")
+        self.article = Article.objects.create(
+            title="Artículo presentado",
+            abstract="Resumen",
+            keywords="presentación",
+            thematic_line=thematic_line,
+            responsible_author=author,
+            status=ArticleStatus.AVAL_PRESENTACION,
+        )
+        reviewer = User.objects.create_user(
+            email="jurado.presentacion@univalle.edu.co",
+            password="Password123!",
+            full_name="Jurado Presentación",
+            affiliation="Universidad del Valle",
+        )
+        self.assignment = ArticleReviewer.objects.create(
+            article=self.article,
+            reviewer=reviewer,
+        )
+
+    def test_presentation_approval_defaults_to_pending(self):
+        approval = PresentacionAval.objects.create(
+            article=self.article,
+            assignment=self.assignment,
+        )
+
+        approval.refresh_from_db()
+        self.assertEqual(
+            approval.status,
+            PresentationApprovalStatus.PENDIENTE,
+        )
+        self.assertIsNone(approval.recorded_at)
+
+    def test_presentation_approval_records_jury_decision_and_date(self):
+        approval = PresentacionAval.objects.create(
+            article=self.article,
+            assignment=self.assignment,
+            status=PresentationApprovalStatus.AVALADO,
+            recorded_at=timezone.now(),
+        )
+
+        approval.refresh_from_db()
+        self.assertEqual(
+            approval.status,
+            PresentationApprovalStatus.AVALADO,
+        )
+        self.assertIsNotNone(approval.recorded_at)
 

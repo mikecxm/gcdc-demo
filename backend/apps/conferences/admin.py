@@ -9,6 +9,7 @@ from .models import (
     CoAuthor,
     Conference,
     Evaluation,
+    PresentacionAval,
     ThematicLine,
 )
 
@@ -80,3 +81,10 @@ class ArticleReviewerAdmin(admin.ModelAdmin):
 class EvaluationAdmin(admin.ModelAdmin):
     list_display = ("assignment", "version", "decision", "evaluated_at")
     list_filter = ("decision",)
+
+
+@admin.register(PresentacionAval)
+class PresentacionAvalAdmin(admin.ModelAdmin):
+    list_display = ("article", "assignment", "status", "recorded_at", "created_at")
+    list_filter = ("status", "recorded_at")
+    search_fields = ("article__title", "assignment__reviewer__email")
