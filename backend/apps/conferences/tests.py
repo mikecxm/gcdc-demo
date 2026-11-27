@@ -2,7 +2,17 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Article, ArticleMetadataAudit, ArticleStatus, ThematicLine
+from .models import (
+    Article,
+    ArticleMetadataAudit,
+    ArticleReviewer,
+    ArticleStatus,
+    ArticleVersion,
+    Decision,
+    Evaluation,
+    ThematicLine,
+    VersionStage,
+)
 
 User = get_user_model()
 
@@ -133,4 +143,68 @@ class ArticleDisablementTests(TestCase):
         self.article.title = final_title
         self.article.save()
         self.assertEqual(ArticleMetadataAudit.objects.filter(article=self.article).count(), 3)
+
+
+class EvaluationStateTriggerTests(TestCase):
+    """Pruebas de GCDC-162: trigger de estado desde evaluaciones."""
+
+    def setUp(self):
+        author = User.objects.create_user(
+            email="autor.evaluacion@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Evaluación",
+            affiliation="Universidad del Valle",
+        )
+        thematic_line = ThematicLine.objects.create(name="Sistemas")
+        self.article = Article.objects.create(
+            title="Artículo evaluado",
+            abstract="Resumen",
+            keywords="evaluación",
+            thematic_line=thematic_line,
+            responsible_author=author,
+            status=ArticleStatus.EN_REVISION,
+        )
+        self.version = ArticleVersion.objects.create(
+            article=self.article,
+            version_number=1,
+            stage=VersionStage.FINAL_PUBLICACION,
+            pdf_url="https://example.com/final.pdf",
+        )
+        self.reviewers = []
+        for number in range(1, 4):
+            reviewer = User.objects.create_user(
+                email=f"jurado{number}@univalle.edu.co",
+                password="Password123!",
+                full_name=f"Jurado {number}",
+                affiliation="Universidad del Valle",
+            )
+            assignment = ArticleReviewer.objects.create(
+                article=self.article,
+                reviewer=reviewer,
+            )
+            self.reviewers.append(assignment)
+
+    def evaluate_all(self, decision):
+        for assignment in self.reviewers:
+            Evaluation.objects.create(
+                version=self.version,
+                assignment=assignment,
+                originality_score=4.5,
+                technical_quality_score=4.5,
+                relevance_score=4.5,
+                comments=f"Comentario {decision}",
+                decision=decision,
+            )
+
+    def test_all_avalado_sets_publication_approval_status(self):
+        self.evaluate_all(Decision.AVALADO)
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.AVAL_PUBLICACION)
+
+    def test_all_not_approved_sets_rejected_status(self):
+        self.evaluate_all(Decision.NO_AVALADO)
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.RECHAZADO)
 
