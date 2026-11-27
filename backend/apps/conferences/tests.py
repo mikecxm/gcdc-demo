@@ -2,7 +2,14 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Article, ArticleMetadataAudit, ArticleStatus, ThematicLine
+from .models import (
+    Article,
+    ArticleMetadataAudit,
+    ArticleStatus,
+    ArticleVersion,
+    PublicacionAval,
+    ThematicLine,
+)
 
 User = get_user_model()
 
@@ -133,4 +140,57 @@ class ArticleDisablementTests(TestCase):
         self.article.title = final_title
         self.article.save()
         self.assertEqual(ArticleMetadataAudit.objects.filter(article=self.article).count(), 3)
+
+
+class PublicationApprovalDatabaseTests(TestCase):
+    """Pruebas de GCDC-174: entrega final y aval de publicación."""
+
+    def setUp(self):
+        author = User.objects.create_user(
+            email="autor.final@univalle.edu.co",
+            password="Password123!",
+            full_name="Autor Final",
+            affiliation="Universidad del Valle",
+        )
+        thematic_line = ThematicLine.objects.create(name="Ingeniería de Software")
+        self.article = Article.objects.create(
+            title="Artículo final",
+            abstract="Resumen final",
+            keywords="final, publicación",
+            thematic_line=thematic_line,
+            responsible_author=author,
+            status=ArticleStatus.AVAL_PUBLICACION,
+        )
+        self.version = ArticleVersion.objects.create(
+            article=self.article,
+            version_number=1,
+            pdf_url="https://example.com/final.pdf",
+            final_pdf="https://example.com/entrega-final.pdf",
+            copyrightpdf="https://example.com/copyright.pdf",
+        )
+
+    def test_final_and_copyright_pdf_fields_are_persisted(self):
+        self.version.refresh_from_db()
+
+        self.assertEqual(
+            self.version.final_pdf,
+            "https://example.com/entrega-final.pdf",
+        )
+        self.assertEqual(
+            self.version.copyrightpdf,
+            "https://example.com/copyright.pdf",
+        )
+
+    def test_publication_approval_is_related_to_article_and_final_version(self):
+        approval = PublicacionAval.objects.create(
+            article=self.article,
+            version=self.version,
+            is_approved=True,
+            approved_at=timezone.now(),
+        )
+
+        approval.refresh_from_db()
+        self.assertEqual(approval.article, self.article)
+        self.assertEqual(approval.version, self.version)
+        self.assertTrue(approval.is_approved)
 

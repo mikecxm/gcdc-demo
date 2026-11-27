@@ -6,6 +6,7 @@ from .models import (
     ArticleVersion,
     CoAuthor,
     Conference,
+    PublicacionAval,
     ThematicLine,
 )
 
@@ -65,3 +66,10 @@ class ArticleMetadataAuditAdmin(admin.ModelAdmin):
     list_filter = ("field_name", "modified_at")
     search_fields = ("article__title", "old_value", "new_value")
     readonly_fields = ("article", "field_name", "old_value", "new_value", "modified_at")
+
+
+@admin.register(PublicacionAval)
+class PublicacionAvalAdmin(admin.ModelAdmin):
+    list_display = ("article", "version", "is_approved", "approved_at", "created_at")
+    list_filter = ("is_approved", "approved_at")
+    search_fields = ("article__title",)

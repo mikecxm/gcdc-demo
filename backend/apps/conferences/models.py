@@ -162,8 +162,14 @@ class ArticleVersion(models.Model):
         default=VersionStage.INICIAL,
     )
     pdf_url = models.URLField(_("URL del PDF"), max_length=500)
-    copyright_pdf_url = models.URLField(
-        _("URL del PDF de cesión de copyright"),
+    final_pdf = models.URLField(
+        _("PDF final"),
+        max_length=500,
+        blank=True,
+        default="",
+    )
+    copyrightpdf = models.URLField(
+        _("PDF de cesión de copyright"),
         max_length=500,
         blank=True,
         default="",
@@ -184,6 +190,35 @@ class ArticleVersion(models.Model):
 
     def __str__(self):
         return f"{self.article.title} - v{self.version_number}"
+
+
+class PublicacionAval(models.Model):
+    """Aval de publicación asociado a la versión final de un artículo."""
+
+    article = models.OneToOneField(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="publication_approval",
+        verbose_name=_("artículo"),
+    )
+    version = models.ForeignKey(
+        ArticleVersion,
+        on_delete=models.PROTECT,
+        related_name="publication_approvals",
+        verbose_name=_("versión final"),
+    )
+    is_approved = models.BooleanField(_("aprobado"), default=False)
+    approved_at = models.DateTimeField(_("fecha de aprobación"), null=True, blank=True)
+    created_at = models.DateTimeField(_("fecha de creación"), auto_now_add=True)
+
+    class Meta:
+        db_table = "publicacion_aval"
+        verbose_name = _("aval de publicación")
+        verbose_name_plural = _("avales de publicación")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Aval de publicación - {self.article.title}"
 
 
 class ArticleMetadataAudit(models.Model):
