@@ -271,6 +271,59 @@ class ArticleReviewer(models.Model):
         return f"{self.reviewer.email} -> {self.article.title}"
 
 
+class PresentationApprovalStatus(models.TextChoices):
+    PENDIENTE = "PENDIENTE", _("Pendiente")
+    AVALADO = "AVALADO", _("Avalado")
+    NO_AVALADO = "NO_AVALADO", _("No avalado")
+
+
+class PresentacionAval(models.Model):
+    """Registro individual del aval del jurado para presentar un artículo."""
+
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name="presentation_approvals",
+        verbose_name=_("artículo"),
+    )
+    assignment = models.ForeignKey(
+        ArticleReviewer,
+        on_delete=models.PROTECT,
+        related_name="presentation_approvals",
+        verbose_name=_("asignación del jurado"),
+    )
+    status = models.CharField(
+        _("estado"),
+        max_length=12,
+        choices=PresentationApprovalStatus.choices,
+        default=PresentationApprovalStatus.PENDIENTE,
+    )
+    recorded_at = models.DateTimeField(
+        _("fecha de registro"),
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(
+        _("fecha de creación"),
+        auto_now_add=True,
+    )
+
+    class Meta:
+        db_table = "presentacion_aval"
+        verbose_name = _("aval de presentación")
+        verbose_name_plural = _("avales de presentación")
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article", "assignment"],
+                name="unique_article_presentation_assignment",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.assignment.reviewer.email} - {self.status}"
+
+
 class Decision(models.TextChoices):
     ACEPTADO = "ACEPTADO", _("Aceptado")
     RECHAZADO = "RECHAZADO", _("Rechazado")
